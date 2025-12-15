@@ -4,370 +4,117 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok Live Viewer</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 800px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            animation: slideUp 0.5s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .header {
-            background: linear-gradient(135deg, #FF0050 0%, #00F2EA 100%);
-            padding: 30px;
-            text-align: center;
-            color: white;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #4ade80;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            50% {
-                opacity: 0.5;
-                transform: scale(1.1);
-            }
-        }
-
-        .connect-form {
-            padding: 20px 30px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .form-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        input[type="text"] {
-            flex: 1;
-            padding: 12px 16px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        button {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .events {
-            height: 500px;
-            overflow-y: auto;
-            padding: 20px 30px;
-            background: white;
-        }
-
-        .events::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .events::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-
-        .events::-webkit-scrollbar-thumb {
-            background: #667eea;
-            border-radius: 10px;
-        }
-
-        .event {
-            padding: 15px;
-            margin-bottom: 12px;
-            border-radius: 12px;
-            animation: fadeIn 0.3s ease-out;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .event-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            flex-shrink: 0;
-        }
-
-        .event-content {
-            flex: 1;
-        }
-
-        .event-user {
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 4px;
-        }
-
-        .event-message {
-            color: #6b7280;
-            font-size: 0.95rem;
-        }
-
-        .event-comment {
-            background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
-        }
-
-        .event-comment .event-icon {
-            background: #667eea;
-            color: white;
-        }
-
-        .event-gift {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        }
-
-        .event-gift .event-icon {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .event-like {
-            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
-        }
-
-        .event-like .event-icon {
-            background: #ef4444;
-            color: white;
-        }
-
-        .event-follow {
-            background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
-        }
-
-        .event-follow .event-icon {
-            background: #10b981;
-            color: white;
-        }
-
-        .event-share {
-            background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
-        }
-
-        .event-share .event-icon {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .event-join {
-            background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
-        }
-
-        .event-join .event-icon {
-            background: #a855f7;
-            color: white;
-        }
-
-        .event-system {
-            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-        }
-
-        .event-system .event-icon {
-            background: #6b7280;
-            color: white;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #9ca3af;
-        }
-
-        .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-
-        .empty-state-text {
-            font-size: 1.1rem;
-        }
-
-        .stats {
-            display: flex;
-            gap: 20px;
-            padding: 20px 30px;
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
-        }
-
-        .stat {
-            flex: 1;
-            text-align: center;
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🎥 TikTok Live Viewer</h1>
-            <div class="status">
-                <span class="status-dot"></span>
-                <span id="status-text">Connected</span>
+        <!-- LEFT COLUMN: CONTROLS & ERRORS -->
+        <div class="left-column">
+            <div class="control-panel">
+                <div class="panel-title">
+                    ⚙️ Controls
+                </div>
+                
+                <div class="status-indicator">
+                    <span class="status-dot disconnected" id="status-dot"></span>
+                    <span class="status-text" id="status-text">Disconnected</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">TikTok Username</label>
+                    <input type="text" id="username" placeholder="@isaackogz" value="@isaackogz">
+                </div>
+
+                <button class="btn btn-primary" id="connect-btn" onclick="connectToStream()">
+                    🔗 Connect
+                </button>
+                <button class="btn btn-danger" id="disconnect-btn" onclick="disconnectFromStream()" disabled>
+                    ⛔ Disconnect
+                </button>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <label class="form-label">Settings</label>
+                    <p style="font-size: 0.85rem; color: #9ca3af;">More settings coming soon...</p>
+                </div>
+            </div>
+
+            <div class="error-container">
+                <div class="panel-title" style="margin-bottom: 16px;">
+                    🚨 Errors & Logs
+                </div>
+                <div id="error-list"></div>
             </div>
         </div>
 
-        <div class="connect-form">
-            <div class="form-group">
-                <input type="text" id="username" placeholder="Enter TikTok username (e.g., @isaackogz)" value="@isaackogz">
-                <button onclick="connectToStream()">Connect</button>
+        <!-- MIDDLE COLUMN: CHAT -->
+        <div class="middle-column">
+            <div class="chat-header">
+                <h1>💬 Live Chat</h1>
+                <p class="chat-subtitle">Latest 20 messages</p>
+            </div>
+            <div class="chat-container" id="chat-container">
+                <div class="empty-state">
+                    <div class="empty-state-icon">💭</div>
+                    <div>Waiting for chat messages...</div>
+                </div>
             </div>
         </div>
 
-        <div class="events" id="events">
-            <div class="empty-state">
-                <div class="empty-state-icon">📡</div>
-                <div class="empty-state-text">Waiting for events...</div>
+        <!-- RIGHT COLUMN: EVENTS -->
+        <div class="right-column">
+            <!-- Notifications (Join, Share, Like) -->
+            <div class="event-panel">
+                <div class="event-panel-header header-notifications">
+                    <span>🔔 Notifications</span>
+                    <span class="event-counter" id="notification-count">0</span>
+                </div>
+                <div class="notification-area" id="notification-area">
+                    <div class="empty-state" style="position: static;">
+                        <div class="empty-state-icon" style="font-size: 3rem;">🔕</div>
+                        <div style="font-size: 0.9rem;">No recent activity</div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-value" id="total-events">0</div>
-                <div class="stat-label">Total Events</div>
+            <!-- Gifts -->
+            <div class="event-panel">
+                <div class="event-panel-header header-gifts">
+                    <span>🎁 Gifts</span>
+                    <span class="event-counter" id="gifts-count">0</span>
+                </div>
+                <div class="event-list" id="gifts-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="font-size: 3rem;">🎀</div>
+                        <div style="font-size: 0.9rem;">No gifts yet</div>
+                    </div>
+                </div>
             </div>
-            <div class="stat">
-                <div class="stat-value" id="total-comments">0</div>
-                <div class="stat-label">Comments</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="total-gifts">0</div>
-                <div class="stat-label">Gifts</div>
+
+            <!-- Follows -->
+            <div class="event-panel">
+                <div class="event-panel-header header-follows">
+                    <span>👥 New Followers</span>
+                    <span class="event-counter" id="follows-count">0</span>
+                </div>
+                <div class="event-list" id="follows-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="font-size: 3rem;">👋</div>
+                        <div style="font-size: 0.9rem;">No followers yet</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         let ws = null;
-        let stats = {
-            totalEvents: 0,
-            comments: 0,
-            gifts: 0
-        };
-
-        const eventIcons = {
-            'comment': '💬',
-            'gift': '🎁',
-            'like': '❤️',
-            'follow': '👤',
-            'share': '📤',
-            'join': '👋',
-            'system': 'ℹ️'
+        let isConnected = false;
+        const MAX_CHAT_MESSAGES = 20;
+        let notificationTimeouts = [];
+        let counters = {
+            notifications: 0,
+            gifts: 0,
+            follows: 0
         };
 
         function connectWebSocket() {
@@ -376,7 +123,6 @@
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
-                document.getElementById('status-text').textContent = 'Connected';
             };
 
             ws.onmessage = (event) => {
@@ -386,119 +132,316 @@
 
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                document.getElementById('status-text').textContent = 'Error';
+                addError('WebSocket connection error');
             };
 
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
-                document.getElementById('status-text').textContent = 'Disconnected';
+                if (isConnected) {
+                    updateConnectionStatus('disconnected');
+                }
                 setTimeout(connectWebSocket, 3000);
             };
         }
 
-        function handleEvent(data) {
-            const eventsContainer = document.getElementById('events');
+        function updateConnectionStatus(status) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+
+            dot.className = 'status-dot ' + status;
             
-            // Remove empty state
-            const emptyState = eventsContainer.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
-
-            // Update stats
-            stats.totalEvents++;
-            if (data.type === 'comment') stats.comments++;
-            if (data.type === 'gift') stats.gifts++;
-            updateStats();
-
-            // Create event element
-            const eventEl = document.createElement('div');
-            eventEl.className = `event event-${data.type}`;
-
-            const icon = document.createElement('div');
-            icon.className = 'event-icon';
-            icon.textContent = eventIcons[data.type] || '📢';
-
-            const content = document.createElement('div');
-            content.className = 'event-content';
-
-            let html = '';
-
-            switch(data.type) {
-                case 'comment':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">${escapeHtml(data.message)}</div>
-                    `;
-                    break;
-                case 'gift':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">sent ${data.count}x ${escapeHtml(data.gift_name)}</div>
-                    `;
-                    break;
-                case 'like':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">liked (${data.total_likes} total)</div>
-                    `;
-                    break;
-                case 'follow':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">followed the stream!</div>
-                    `;
-                    break;
-                case 'share':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">shared the stream!</div>
-                    `;
-                    break;
-                case 'join':
-                    html = `
-                        <div class="event-user">${escapeHtml(data.user)}</div>
-                        <div class="event-message">joined the stream!</div>
-                    `;
-                    break;
-                case 'system':
-                    html = `
-                        <div class="event-message">${escapeHtml(data.message)}</div>
-                    `;
-                    break;
-            }
-
-            content.innerHTML = html;
-            eventEl.appendChild(icon);
-            eventEl.appendChild(content);
-            
-            eventsContainer.insertBefore(eventEl, eventsContainer.firstChild);
-
-            // Keep only last 100 events
-            while (eventsContainer.children.length > 100) {
-                eventsContainer.removeChild(eventsContainer.lastChild);
+            if (status === 'connected') {
+                text.textContent = 'Connected';
+                isConnected = true;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else if (status === 'connecting') {
+                text.textContent = 'Connecting...';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = true;
+            } else {
+                text.textContent = 'Disconnected';
+                isConnected = false;
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
             }
         }
 
-        function updateStats() {
-            document.getElementById('total-events').textContent = stats.totalEvents;
-            document.getElementById('total-comments').textContent = stats.comments;
-            document.getElementById('total-gifts').textContent = stats.gifts;
+        function addError(message) {
+            const errorList = document.getElementById('error-list');
+            const emptyState = errorList.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const errorItem = document.createElement('div');
+            errorItem.className = 'error-item';
+            
+            const time = new Date().toLocaleTimeString();
+            errorItem.innerHTML = `
+                <div class="error-time">${time}</div>
+                <div class="error-message">${escapeHtml(message)}</div>
+            `;
+            
+            errorList.insertBefore(errorItem, errorList.firstChild);
+
+            while (errorList.children.length > 50) {
+                errorList.removeChild(errorList.lastChild);
+            }
+        }
+
+        function updateCounter(type, value) {
+            counters[type] = value || counters[type] + 1;
+            const counterId = type + '-count';
+            const counter = document.getElementById(counterId);
+            if (counter) {
+                counter.textContent = counters[type];
+            }
+        }
+
+        function handleEvent(data) {
+            switch(data.type) {
+                case 'comment':
+                    addChatMessage(data);
+                    break;
+                case 'gift':
+                    addGift(data);
+                    break;
+                case 'follow':
+                    addFollow(data);
+                    break;
+                case 'join':
+                case 'share':
+                case 'like':
+                    addNotification(data);
+                    break;
+                case 'status':
+                    if (data.status === 'connecting') {
+                        updateConnectionStatus('connecting');
+                    }
+                    break;
+                case 'system':
+                    if (data.message.includes('Connected to @')) {
+                        updateConnectionStatus('connected');
+                    } else if (data.message.includes('Disconnected')) {
+                        updateConnectionStatus('disconnected');
+                    }
+                    break;
+                case 'error':
+                    addError(data.message);
+                    updateConnectionStatus('disconnected');
+                    break;
+            }
+        }
+
+        function createAvatar(user, avatarUrl) {
+            const avatarEl = document.createElement('div');
+            avatarEl.className = 'chat-avatar';
+            
+            if (avatarUrl) {
+                const img = document.createElement('img');
+                img.src = avatarUrl;
+                img.alt = user;
+                img.onerror = function() {
+                    // Fallback to initial if image fails
+                    avatarEl.innerHTML = user.charAt(0).toUpperCase();
+                };
+                avatarEl.appendChild(img);
+            } else {
+                avatarEl.textContent = user.charAt(0).toUpperCase();
+            }
+            
+            return avatarEl;
+        }
+
+        function addChatMessage(data) {
+            const container = document.getElementById('chat-container');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const messageEl = document.createElement('div');
+            messageEl.className = 'chat-message';
+
+            const avatarEl = createAvatar(data.user, data.avatar_url);
+            
+            const contentEl = document.createElement('div');
+            contentEl.className = 'chat-content';
+            contentEl.innerHTML = `
+                <div class="chat-username">${escapeHtml(data.user)}</div>
+                <div class="chat-text">${escapeHtml(data.message)}</div>
+            `;
+
+            const iconEl = document.createElement('div');
+            iconEl.className = 'chat-icon';
+            iconEl.textContent = '💬';
+
+            messageEl.appendChild(avatarEl);
+            messageEl.appendChild(contentEl);
+            messageEl.appendChild(iconEl);
+
+            container.insertBefore(messageEl, container.firstChild);
+
+            while (container.children.length > MAX_CHAT_MESSAGES) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function addGift(data) {
+            const container = document.getElementById('gifts-list');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const giftEl = document.createElement('div');
+            giftEl.className = 'event-item event-item-gift';
+            
+            const avatarEl = document.createElement('div');
+            avatarEl.className = 'event-item-avatar';
+            if (data.avatar_url) {
+                const img = document.createElement('img');
+                img.src = data.avatar_url;
+                img.alt = data.user;
+                img.onerror = function() {
+                    avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
+                };
+                avatarEl.appendChild(img);
+            } else {
+                avatarEl.textContent = data.user.charAt(0).toUpperCase();
+            }
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'event-item-content';
+            contentEl.innerHTML = `
+                <div class="event-item-user">${escapeHtml(data.user)}</div>
+                <div class="event-item-detail">${data.count}x ${escapeHtml(data.gift_name)}</div>
+            `;
+
+            giftEl.appendChild(avatarEl);
+            giftEl.appendChild(contentEl);
+
+            container.insertBefore(giftEl, container.firstChild);
+            updateCounter('gifts');
+
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function addFollow(data) {
+            const container = document.getElementById('follows-list');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const followEl = document.createElement('div');
+            followEl.className = 'event-item event-item-follow';
+            
+            const avatarEl = document.createElement('div');
+            avatarEl.className = 'event-item-avatar';
+            if (data.avatar_url) {
+                const img = document.createElement('img');
+                img.src = data.avatar_url;
+                img.alt = data.user;
+                img.onerror = function() {
+                    avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
+                };
+                avatarEl.appendChild(img);
+            } else {
+                avatarEl.textContent = data.user.charAt(0).toUpperCase();
+            }
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'event-item-content';
+            contentEl.innerHTML = `
+                <div class="event-item-user">${escapeHtml(data.user)}</div>
+                <div class="event-item-detail">Started following</div>
+            `;
+
+            followEl.appendChild(avatarEl);
+            followEl.appendChild(contentEl);
+
+            container.insertBefore(followEl, container.firstChild);
+            updateCounter('follows');
+
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function addNotification(data) {
+            const container = document.getElementById('notification-area');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const existing = container.querySelectorAll('.notification-toast');
+            existing.forEach(el => el.remove());
+            notificationTimeouts.forEach(timeout => clearTimeout(timeout));
+            notificationTimeouts = [];
+
+            const toastEl = document.createElement('div');
+            let icon, className, message;
+
+            switch(data.type) {
+                case 'join':
+                    icon = '👋';
+                    className = 'toast-join';
+                    message = 'joined the stream';
+                    break;
+                case 'share':
+                    icon = '📤';
+                    className = 'toast-share';
+                    message = 'shared the stream';
+                    break;
+                case 'like':
+                    icon = '❤️';
+                    className = 'toast-like';
+                    message = `liked (${data.total_likes} total)`;
+                    break;
+            }
+
+            toastEl.className = `notification-toast ${className}`;
+            toastEl.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-content">
+                    <div class="toast-user">${escapeHtml(data.user)}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+
+            container.appendChild(toastEl);
+            updateCounter('notifications');
+
+            const timeout = setTimeout(() => {
+                toastEl.remove();
+            }, 3000);
+            notificationTimeouts.push(timeout);
         }
 
         function connectToStream() {
             const username = document.getElementById('username').value.trim();
             if (!username) {
-                alert('Please enter a username');
+                addError('Please enter a username');
                 return;
             }
+
+            updateConnectionStatus('connecting');
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     action: 'connect',
                     username: username
                 }));
+            } else {
+                addError('WebSocket not ready. Please wait...');
+                updateConnectionStatus('disconnected');
             }
+        }
+
+        function disconnectFromStream() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: 'disconnect'
+                }));
+            }
+            updateConnectionStatus('disconnected');
         }
 
         function escapeHtml(text) {
@@ -507,7 +450,7 @@
             return div.innerHTML;
         }
 
-        // Connect on page load
+        // Connect WebSocket on page load (but don't connect to TikTok)
         connectWebSocket();
 
         // Allow Enter key to connect

@@ -7,7 +7,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - TIKTOK_USERNAME=@isaackogz
+      - TIKTOK_USERNAME=lightskinnightmare
     volumes:
       - ./app.py:/app/app.py
       - ./templates:/app/templates

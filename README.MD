@@ -24,8 +24,10 @@ A beautiful, real-time TikTok Live event viewer with a modern UI. Built with Pyt
 ├── docker-compose.yml
 ├── requirements.txt
 ├── app.py
-└── templates/
-    └── index.html
+├── templates/
+│   └── index.html
+└── static/
+    └── style.css
 ```
 
 ## Setup & Running 🚀
@@ -34,10 +36,16 @@ A beautiful, real-time TikTok Live event viewer with a modern UI. Built with Pyt
 
 ```bash
 # Create directories
-mkdir -p tiktok-live-viewer/templates
+mkdir -p tiktok-live-viewer/templates tiktok-live-viewer/static
 cd tiktok-live-viewer
 
-# Create all the files (Dockerfile, docker-compose.yml, requirements.txt, app.py, templates/index.html)
+# Create all the files:
+# - Dockerfile
+# - docker-compose.yml
+# - requirements.txt
+# - app.py
+# - templates/index.html
+# - static/style.css
 # Copy the contents from the artifacts above
 ```
 
