@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #FF0050 0%, #00F2EA 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.1);
+            }
+        }
+
+        .connect-form {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .events {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px 30px;
+            background: white;
+        }
+
+        .events::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .events::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .events::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        .event {
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .event-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .event-content {
+            flex: 1;
+        }
+
+        .event-user {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .event-message {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        .event-comment {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+        }
+
+        .event-comment .event-icon {
+            background: #667eea;
+            color: white;
+        }
+
+        .event-gift {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        }
+
+        .event-gift .event-icon {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .event-like {
+            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+        }
+
+        .event-like .event-icon {
+            background: #ef4444;
+            color: white;
+        }
+
+        .event-follow {
+            background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+        }
+
+        .event-follow .event-icon {
+            background: #10b981;
+            color: white;
+        }
+
+        .event-share {
+            background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+        }
+
+        .event-share .event-icon {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .event-join {
+            background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
+        }
+
+        .event-join .event-icon {
+            background: #a855f7;
+            color: white;
+        }
+
+        .event-system {
+            background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+        }
+
+        .event-system .event-icon {
+            background: #6b7280;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 TikTok Live Viewer</h1>
+            <div class="status">
+                <span class="status-dot"></span>
+                <span id="status-text">Connected</span>
+            </div>
+        </div>
+
+        <div class="connect-form">
+            <div class="form-group">
+                <input type="text" id="username" placeholder="Enter TikTok username (e.g., @isaackogz)" value="@isaackogz">
+                <button onclick="connectToStream()">Connect</button>
+            </div>
+        </div>
+
+        <div class="events" id="events">
+            <div class="empty-state">
+                <div class="empty-state-icon">📡</div>
+                <div class="empty-state-text">Waiting for events...</div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="total-events">0</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="total-comments">0</div>
+                <div class="stat-label">Comments</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="total-gifts">0</div>
+                <div class="stat-label">Gifts</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let stats = {
+            totalEvents: 0,
+            comments: 0,
+            gifts: 0
+        };
+
+        const eventIcons = {
+            'comment': '💬',
+            'gift': '🎁',
+            'like': '❤️',
+            'follow': '👤',
+            'share': '📤',
+            'join': '👋',
+            'system': 'ℹ️'
+        };
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                document.getElementById('status-text').textContent = 'Connected';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleEvent(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                document.getElementById('status-text').textContent = 'Error';
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                document.getElementById('status-text').textContent = 'Disconnected';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function handleEvent(data) {
+            const eventsContainer = document.getElementById('events');
+            
+            // Remove empty state
+            const emptyState = eventsContainer.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Update stats
+            stats.totalEvents++;
+            if (data.type === 'comment') stats.comments++;
+            if (data.type === 'gift') stats.gifts++;
+            updateStats();
+
+            // Create event element
+            const eventEl = document.createElement('div');
+            eventEl.className = `event event-${data.type}`;
+
+            const icon = document.createElement('div');
+            icon.className = 'event-icon';
+            icon.textContent = eventIcons[data.type] || '📢';
+
+            const content = document.createElement('div');
+            content.className = 'event-content';
+
+            let html = '';
+
+            switch(data.type) {
+                case 'comment':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">${escapeHtml(data.message)}</div>
+                    `;
+                    break;
+                case 'gift':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">sent ${data.count}x ${escapeHtml(data.gift_name)}</div>
+                    `;
+                    break;
+                case 'like':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">liked (${data.total_likes} total)</div>
+                    `;
+                    break;
+                case 'follow':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">followed the stream!</div>
+                    `;
+                    break;
+                case 'share':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">shared the stream!</div>
+                    `;
+                    break;
+                case 'join':
+                    html = `
+                        <div class="event-user">${escapeHtml(data.user)}</div>
+                        <div class="event-message">joined the stream!</div>
+                    `;
+                    break;
+                case 'system':
+                    html = `
+                        <div class="event-message">${escapeHtml(data.message)}</div>
+                    `;
+                    break;
+            }
+
+            content.innerHTML = html;
+            eventEl.appendChild(icon);
+            eventEl.appendChild(content);
+            
+            eventsContainer.insertBefore(eventEl, eventsContainer.firstChild);
+
+            // Keep only last 100 events
+            while (eventsContainer.children.length > 100) {
+                eventsContainer.removeChild(eventsContainer.lastChild);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('total-events').textContent = stats.totalEvents;
+            document.getElementById('total-comments').textContent = stats.comments;
+            document.getElementById('total-gifts').textContent = stats.gifts;
+        }
+
+        function connectToStream() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: 'connect',
+                    username: username
+                }));
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Connect on page load
+        connectWebSocket();
+
+        // Allow Enter key to connect
+        document.getElementById('username').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                connectToStream();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  tiktok-live:
+    build: .
+    container_name: tiktok-live-viewer
+    ports:
+      - "8080:8080"
+    environment:
+      - TIKTOK_USERNAME=@isaackogz
+    volumes:
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+      - ./static:/app/static
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
