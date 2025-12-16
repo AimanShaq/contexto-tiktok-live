@@ -22,7 +22,7 @@
 
                 <div class="form-group">
                     <label class="form-label">TikTok Username</label>
-                    <input type="text" id="username" placeholder="@isaackogz" value="@isaackogz">
+                    <input type="text" id="username" placeholder="@n0slack" value="@n0slack">
                 </div>
 
                 <button class="btn btn-primary" id="connect-btn" onclick="connectToStream()">
@@ -67,7 +67,7 @@
                 <div class="game-title">
                     <span class="game-label">GAME: #</span>
                     <!-- <span class="game-number" id="game-number">----</span> -->
-                    <span class="game-number">RANDOM</span>
+                    <span class="game-number" id="game-number">RANDOM</span>
                 </div>
                 <div class="game-guesses">
                     <span class="guesses-label">GUESSES:</span>
@@ -105,7 +105,10 @@
             </div>
 
             <div class="hints-panel">
-                <div class="hints-header">💡 Hints</div>
+                <div class="hints-header">
+                    <span>💡 Hints</span>
+                    <button class="free-hint-btn" onclick="requestFreeHint()">🎁 Free Hint</button>
+                </div>
                 <div class="hints-list" id="hints-list">
                     <div class="empty-state" style="padding: 30px 20px;">
                         <div class="empty-state-icon" style="font-size: 2.5rem;">🔮</div>
@@ -278,11 +281,36 @@
 
         function showGuessNotification(data) {
             const popup = document.getElementById('notification-popup');
-            popup.textContent = `${data.user} guessed: ${data.word}`;
-            popup.classList.add('show');
+            
+            // Create avatar element
+            let avatarHTML = '';
+            if (data.avatar_url) {
+                avatarHTML = `<img src="${data.avatar_url}" alt="${data.user}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                              <div class="notif-avatar-fallback" style="display:none;">${data.user.charAt(0).toUpperCase()}</div>`;
+            } else {
+                avatarHTML = `<div class="notif-avatar-fallback">${data.user.charAt(0).toUpperCase()}</div>`;
+            }
+            
+            popup.innerHTML = `
+                <div class="notif-avatar">${avatarHTML}</div>
+                <div class="notif-content">
+                    <div class="notif-user">${escapeHtml(data.user)}</div>
+                    <div class="notif-text">guessed: <strong>${escapeHtml(data.word)}</strong></div>
+                </div>
+            `;
+            
+            // Add pop animation
+            popup.classList.remove('show');
+            popup.classList.add('pop');
+            
+            setTimeout(() => {
+                popup.classList.remove('pop');
+                popup.classList.add('show');
+            }, 10);
             
             setTimeout(() => {
                 popup.classList.remove('show');
+                setTimeout(() => popup.classList.remove('pop'), 300);
             }, 3000);
         }
 
@@ -303,12 +331,31 @@
             // Update count
             document.getElementById('guesses-count').textContent = sorted.length;
             
+            // Get existing words to detect new ones
+            const existingWords = new Set();
+            container.querySelectorAll('.guess-item').forEach(item => {
+                const word = item.dataset.word;
+                if (word) existingWords.add(word);
+            });
+            
             // Clear and rebuild
             container.innerHTML = '';
             
             sorted.forEach(([word, data]) => {
+                const isNew = !existingWords.has(word);
+                
                 const guessEl = document.createElement('div');
                 guessEl.className = `guess-item color-${getDistanceColor(data.distance)}`;
+                guessEl.dataset.word = word;
+                
+                // Add highlight class for new words
+                if (isNew) {
+                    guessEl.classList.add('new-guess');
+                    // Remove highlight after animation
+                    setTimeout(() => {
+                        guessEl.classList.remove('new-guess');
+                    }, 2000);
+                }
                 
                 // Avatar
                 const avatarEl = document.createElement('div');
@@ -517,6 +564,14 @@
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     action: 'reset_game'
+                }));
+            }
+        }
+
+        function requestFreeHint() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: 'free_hint'
                 }));
             }
         }

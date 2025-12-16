@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import re
-import base64
 from typing import Set
 from aiohttp import web, WSMsgType, ClientSession
 from TikTokLive import TikTokLiveClient
@@ -139,11 +138,11 @@ async def on_comment(event: CommentEvent):
         avatar_url = None
         try:
             if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
-                print(word)
                 image_bytes = await tiktok_client.web.fetch_image_data(
                     image=event.user.avatar_thumb
                 )
                 if image_bytes:
+                    import base64
                     avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
         except Exception as img_error:
             print(f"Error fetching avatar: {img_error}")
@@ -153,11 +152,12 @@ async def on_comment(event: CommentEvent):
             'type': 'guess_notification',
             'user': event.user.nickname,
             'word': word,
+            'avatar_url': avatar_url,
             'timestamp': asyncio.get_event_loop().time()
         })
-
+        
         # Fetch from Contexto API
-        # print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
+        print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
         result = await fetch_contexto_api(game_state['game_number'], word)
         
         if not result:
@@ -341,6 +341,8 @@ async def websocket_handler(request):
                         'game_number': game_no,
                         'timestamp': asyncio.get_event_loop().time()
                     })
+                elif data.get('action') == 'free_hint':
+                    await handle_free_hint()
                     
             elif msg.type == WSMsgType.ERROR:
                 print(f'WebSocket error: {ws.exception()}')
@@ -349,6 +351,54 @@ async def websocket_handler(request):
         print(f"🔌 WebSocket disconnected (Total: {len(websocket_clients)})")
     
     return ws
+
+
+async def handle_free_hint():
+    """Provide a free hint to the game master"""
+    try:
+        if not game_state['guesses']:
+            await broadcast_to_clients({
+                'type': 'system',
+                'message': 'No guesses yet! Need at least one guess for a hint.',
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            return
+        
+        # Get lowest distance
+        lowest = min(game_state['guesses'].items(), key=lambda x: x[1]['distance'])
+        lowest_distance = lowest[1]['distance']
+        
+        # Calculate hint distance
+        hint_distance = max(1, lowest_distance // 2)
+        
+        print(f"💡 Free hint requested! Getting hint for distance {hint_distance}")
+        
+        # Fetch tip
+        tip_word = await fetch_contexto_tip(game_state['game_number'], hint_distance)
+        
+        if tip_word:
+            await broadcast_to_clients({
+                'type': 'hint',
+                'word': tip_word,
+                'distance': hint_distance,
+                'gifter': 'Game Master (Free)',
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            print(f"💡 Free hint revealed: '{tip_word}' at distance {hint_distance}")
+        else:
+            await broadcast_to_clients({
+                'type': 'system',
+                'message': 'Failed to get hint from API. Try again!',
+                'timestamp': asyncio.get_event_loop().time()
+            })
+        
+    except Exception as e:
+        print(f"Error in handle_free_hint: {e}")
+        await broadcast_to_clients({
+            'type': 'system',
+            'message': f'Error getting hint: {str(e)}',
+            'timestamp': asyncio.get_event_loop().time()
+        })
 
 
 async def connect_to_tiktok(username: str):
