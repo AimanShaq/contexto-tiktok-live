@@ -62,16 +62,30 @@
 
         <!-- RIGHT COLUMN: EVENTS -->
         <div class="right-column">
-            <!-- Notifications (Join, Share, Like) -->
+            <!-- Notifications (Join only) -->
             <div class="event-panel">
                 <div class="event-panel-header header-notifications">
-                    <span>🔔 Notifications</span>
-                    <span class="event-counter" id="notification-count">0</span>
+                    <span>👋 Join Notifications</span>
+                    <span class="event-counter" id="join-count">0</span>
                 </div>
                 <div class="notification-area" id="notification-area">
                     <div class="empty-state" style="position: static;">
                         <div class="empty-state-icon" style="font-size: 3rem;">🔕</div>
-                        <div style="font-size: 0.9rem;">No recent activity</div>
+                        <div style="font-size: 0.9rem;">No one joined yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Likes Ranking -->
+            <div class="event-panel">
+                <div class="event-panel-header header-likes">
+                    <span>❤️ Top Likers</span>
+                    <span class="event-counter" id="likes-count">0</span>
+                </div>
+                <div class="event-list" id="likes-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="font-size: 3rem;">💖</div>
+                        <div style="font-size: 0.9rem;">No likes yet</div>
                     </div>
                 </div>
             </div>
@@ -112,10 +126,14 @@
         const MAX_CHAT_MESSAGES = 20;
         let notificationTimeouts = [];
         let counters = {
-            notifications: 0,
+            join: 0,
+            likes: 0,
             gifts: 0,
             follows: 0
         };
+        
+        // Track likes per user for ranking
+        let likeRanking = new Map(); // userId -> {user, likes, avatar_url}
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -211,9 +229,13 @@
                     addFollow(data);
                     break;
                 case 'join':
-                case 'share':
+                    addJoinNotification(data);
+                    break;
                 case 'like':
-                    addNotification(data);
+                    addLikeRanking(data);
+                    break;
+                case 'share':
+                    // Ignore shares for now
                     break;
                 case 'status':
                     if (data.status === 'connecting') {
@@ -383,7 +405,7 @@
                 case 'join':
                     icon = '👋';
                     className = 'toast-join';
-                    message = 'joined the stream';
+                    message = `liked (${data.total_likes} total)`;
                     break;
                 case 'share':
                     icon = '📤';
@@ -413,6 +435,98 @@
                 toastEl.remove();
             }, 3000);
             notificationTimeouts.push(timeout);
+        }
+
+        function addJoinNotification(data) {
+            const container = document.getElementById('notification-area');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            // Clear existing notifications
+            const existing = container.querySelectorAll('.notification-toast');
+            existing.forEach(el => el.remove());
+            notificationTimeouts.forEach(timeout => clearTimeout(timeout));
+            notificationTimeouts = [];
+
+            const toastEl = document.createElement('div');
+            toastEl.className = 'notification-toast toast-join';
+            toastEl.innerHTML = `
+                <div class="toast-icon">👋</div>
+                <div class="toast-content">
+                    <div class="toast-user">${escapeHtml(data.user)}</div>
+                    <div class="toast-message">joined the stream</div>
+                </div>
+            `;
+
+            container.appendChild(toastEl);
+            updateCounter('join');
+
+            const timeout = setTimeout(() => {
+                toastEl.remove();
+            }, 3000);
+            notificationTimeouts.push(timeout);
+        }
+
+        function addLikeRanking(data) {
+            // Update ranking map
+            const userId = data.user_id;
+            if (likeRanking.has(userId)) {
+                const existing = likeRanking.get(userId);
+                existing.likes += data.likes;
+            } else {
+                likeRanking.set(userId, {
+                    user: data.user,
+                    likes: data.likes,
+                    avatar_url: data.avatar_url
+                });
+            }
+
+            // Sort by likes descending
+            const sorted = Array.from(likeRanking.values())
+                .sort((a, b) => b.likes - a.likes)
+                .slice(0, 10); // Keep top 10
+
+            // Clear and rebuild list
+            const container = document.getElementById('likes-list');
+            container.innerHTML = '';
+
+            sorted.forEach((entry, index) => {
+                const likeEl = document.createElement('div');
+                likeEl.className = 'event-item event-item-like';
+                
+                const avatarEl = document.createElement('div');
+                avatarEl.className = 'event-item-avatar';
+                if (entry.avatar_url) {
+                    const img = document.createElement('img');
+                    img.src = entry.avatar_url;
+                    img.alt = entry.user;
+                    img.onerror = function() {
+                        avatarEl.innerHTML = entry.user.charAt(0).toUpperCase();
+                    };
+                    avatarEl.appendChild(img);
+                } else {
+                    avatarEl.textContent = entry.user.charAt(0).toUpperCase();
+                }
+
+                const rankBadge = document.createElement('div');
+                rankBadge.className = 'rank-badge';
+                rankBadge.textContent = `#${index + 1}`;
+
+                const contentEl = document.createElement('div');
+                contentEl.className = 'event-item-content';
+                contentEl.innerHTML = `
+                    <div class="event-item-user">${escapeHtml(entry.user)}</div>
+                    <div class="event-item-detail">${entry.likes} likes</div>
+                `;
+
+                likeEl.appendChild(rankBadge);
+                likeEl.appendChild(avatarEl);
+                likeEl.appendChild(contentEl);
+
+                container.appendChild(likeEl);
+            });
+
+            updateCounter('likes', likeRanking.size);
         }
 
         function connectToStream() {

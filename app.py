@@ -55,21 +55,21 @@ async def on_disconnect(event: DisconnectEvent):
 async def on_comment(event: CommentEvent):
     """Handle comment events"""
     try:
-        # Get profile picture URL from avatar object
+        # Get profile picture URL using TikTokLive's web client
         avatar_url = None
-        if hasattr(event.user, 'avatar'):
-            avatar = event.user.avatar
-            if hasattr(avatar, 'url_list') and avatar.url_list:
-                avatar_url = avatar.url_list[0]
+        try:
+            # Fetch image data and convert to base64
+            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                image_bytes = await tiktok_client.web.fetch_image_data(
+                    image=event.user.avatar_thumb
+                )
+                if image_bytes:
+                    import base64
+                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+        except Exception as img_error:
+            print(f"Error fetching avatar for {event.user.nickname}: {img_error}")
         
-        # Fallback to avatar_thumb if avatar not available
-        if not avatar_url and hasattr(event.user, 'avatar_thumb'):
-            if isinstance(event.user.avatar_thumb, dict) and 'url_list' in event.user.avatar_thumb:
-                urls = event.user.avatar_thumb['url_list']
-                if urls:
-                    avatar_url = urls[0]
-        
-        print(f"💬 {event.user.nickname}: {event.comment}")
+        # print(f"💬 {event.user.nickname}: {event.comment}")
         await broadcast_to_clients({
             'type': 'comment',
             'user': event.user.nickname,
@@ -90,10 +90,18 @@ async def on_gift(event: GiftEvent):
                     getattr(getattr(event.gift, 'info', None), 'name', 'Unknown Gift') or \
                     'Unknown Gift'
         
-        # Get profile picture
-        avatar_url = getattr(getattr(event.user, 'avatar', None), 'url_list', [None])[0] if hasattr(event.user, 'avatar') else None
-        if not avatar_url:
-            avatar_url = getattr(event.user, 'avatar_thumb', {}).get('url_list', [None])[0]
+        # Get profile picture using TikTokLive's web client
+        avatar_url = None
+        try:
+            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                image_bytes = await tiktok_client.web.fetch_image_data(
+                    image=event.user.avatar_thumb
+                )
+                if image_bytes:
+                    import base64
+                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+        except Exception as img_error:
+            print(f"Error fetching avatar for gift from {event.user.nickname}: {img_error}")
         
         # Check if gift is repeatable
         is_repeatable = getattr(event.gift, 'streakable', False)
@@ -102,7 +110,7 @@ async def on_gift(event: GiftEvent):
         
         # Only send when streak ends or it's a non-streakable gift
         if is_repeatable and not is_streaking:
-            print(f"🎁 {event.user.nickname} sent {repeat_count}x {gift_name}")
+            # print(f"🎁 {event.user.nickname} sent {repeat_count}x {gift_name}")
             await broadcast_to_clients({
                 'type': 'gift',
                 'user': event.user.nickname,
@@ -112,7 +120,7 @@ async def on_gift(event: GiftEvent):
                 'timestamp': asyncio.get_event_loop().time()
             })
         elif not is_repeatable:
-            print(f"🎁 {event.user.nickname} sent {gift_name}")
+            # print(f"🎁 {event.user.nickname} sent {gift_name}")
             await broadcast_to_clients({
                 'type': 'gift',
                 'user': event.user.nickname,
@@ -132,12 +140,28 @@ async def on_like(event: LikeEvent):
         total_likes = getattr(event, 'total_likes', getattr(event, 'likes', 0))
         likes = getattr(event, 'likes', 1)
         
-        print(f"❤️ {event.user.nickname} liked ({total_likes} total)")
+        # print(f"❤️ {event.user.nickname} liked ({total_likes} total)")
+        
+        # Get profile picture using TikTokLive's web client
+        avatar_url = None
+        try:
+            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                image_bytes = await tiktok_client.web.fetch_image_data(
+                    image=event.user.avatar_thumb
+                )
+                if image_bytes:
+                    import base64
+                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+        except Exception as img_error:
+            print(f"Error fetching avatar for like from {event.user.nickname}: {img_error}")
+        
         await broadcast_to_clients({
             'type': 'like',
             'user': event.user.nickname,
+            'user_id': event.user.unique_id,
             'likes': likes,
             'total_likes': total_likes,
+            'avatar_url': avatar_url,
             'timestamp': asyncio.get_event_loop().time()
         })
     except Exception as e:
@@ -147,12 +171,20 @@ async def on_like(event: LikeEvent):
 async def on_follow(event: FollowEvent):
     """Handle follow events"""
     try:
-        # Get profile picture
-        avatar_url = getattr(getattr(event.user, 'avatar', None), 'url_list', [None])[0] if hasattr(event.user, 'avatar') else None
-        if not avatar_url:
-            avatar_url = getattr(event.user, 'avatar_thumb', {}).get('url_list', [None])[0]
+        # Get profile picture using TikTokLive's web client
+        avatar_url = None
+        try:
+            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                image_bytes = await tiktok_client.web.fetch_image_data(
+                    image=event.user.avatar_thumb
+                )
+                if image_bytes:
+                    import base64
+                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+        except Exception as img_error:
+            print(f"Error fetching avatar for follow from {event.user.nickname}: {img_error}")
         
-        print(f"👤 {event.user.nickname} followed!")
+        # print(f"👤 {event.user.nickname} followed!")
         await broadcast_to_clients({
             'type': 'follow',
             'user': event.user.nickname,
@@ -165,22 +197,28 @@ async def on_follow(event: FollowEvent):
 
 async def on_share(event: ShareEvent):
     """Handle share events"""
-    print(f"📤 {event.user.nickname} shared the stream!")
-    await broadcast_to_clients({
-        'type': 'share',
-        'user': event.user.nickname,
-        'timestamp': asyncio.get_event_loop().time()
-    })
+    try:
+        # print(f"📤 {event.user.nickname} shared the stream!")
+        await broadcast_to_clients({
+            'type': 'share',
+            'user': event.user.nickname,
+            'timestamp': asyncio.get_event_loop().time()
+        })
+    except Exception as e:
+        print(f"Error in on_share: {e}")
 
 
 async def on_join(event: JoinEvent):
     """Handle join events"""
-    print(f"👋 {event.user.nickname} joined!")
-    await broadcast_to_clients({
-        'type': 'join',
-        'user': event.user.nickname,
-        'timestamp': asyncio.get_event_loop().time()
-    })
+    try:
+        # print(f"👋 {event.user.nickname} joined!")
+        await broadcast_to_clients({
+            'type': 'join',
+            'user': event.user.nickname,
+            'timestamp': asyncio.get_event_loop().time()
+        })
+    except Exception as e:
+        print(f"Error in on_join: {e}")
 
 
 async def websocket_handler(request):
