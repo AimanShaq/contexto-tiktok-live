@@ -145,7 +145,7 @@ async def on_comment(event: CommentEvent):
                 )
                 if image_bytes:
                     avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:``
+        except Exception as img_error:
             print(f"Error fetching avatar: {img_error}")
         
         # Show popup notification
