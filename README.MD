@@ -1,15 +1,42 @@
-# TikTok Live Viewer 🎥
+# TikTok Live Contexto Game 🎮
 
-A beautiful, real-time TikTok Live event viewer with a modern UI. Built with Python 3.12, TikTokLive library, and WebSockets.
+An interactive word guessing game powered by TikTok LIVE comments! Based on the popular Contexto game, viewers can guess words through live chat, and the app shows how close they are to the secret word.
 
 ## Features ✨
 
-- 📱 Real-time event streaming (comments, gifts, likes, follows, shares)
-- 🎨 Modern, gradient-based UI with smooth animations
-- 📊 Live statistics tracking
-- 🔄 WebSocket-based communication
-- 🐳 Fully Dockerized setup
-- 🎯 Easy to use - just enter a TikTok username
+- 🎯 **Interactive Word Guessing**: Viewers comment words, app shows distance from target
+- 🎨 **Color-Coded Feedback**: Green (close), Orange (medium), Red (far)
+- 🏆 **Winner Celebration**: Animated leaderboard for top 3 guesses
+- 🎁 **Gift-Powered Hints**: Send gifts to reveal words closer to the target
+- 📊 **Live Leaderboard**: Automatically sorted by distance
+- 👥 **Social Tracking**: Follow & Share events in sidebar
+- 🔄 **Auto-Reset**: New game starts after winner is found
+- 💾 **Manual Reset**: Game master can reset anytime
+
+## How It Works 🎲
+
+### Game Flow
+
+1. **Game Starts**: Random game number (1-1184) is selected
+2. **Players Guess**: Viewers comment words in TikTok LIVE
+3. **API Check**: Each word is checked via Contexto API
+4. **Distance Shown**: Lower distance = closer to target word
+5. **Winner Found**: Distance 0 = WINNER! 🎉
+6. **Leaderboard**: Top 3 guesses displayed for 10 seconds
+7. **New Game**: Automatically starts a new round
+
+### Distance Color Guide
+
+- 🟢 **Green** (≤ 499): Very close!
+- 🟠 **Orange** (500-1500): Getting warmer
+- 🔴 **Red** (> 1500): Far away
+
+### Gift Hints 🎁
+
+When someone sends a gift:
+- Takes the lowest distance guess
+- Divides by 2 (minimum 1)
+- Reveals a word at that distance as a hint
 
 ## Prerequisites 📋
 
@@ -36,8 +63,8 @@ A beautiful, real-time TikTok Live event viewer with a modern UI. Built with Pyt
 
 ```bash
 # Create directories
-mkdir -p tiktok-live-viewer/templates tiktok-live-viewer/static
-cd tiktok-live-viewer
+mkdir -p tiktok-live-contexto/templates tiktok-live-contexto/static
+cd tiktok-live-contexto
 
 # Create all the files:
 # - Dockerfile
@@ -46,7 +73,6 @@ cd tiktok-live-viewer
 # - app.py
 # - templates/index.html
 # - static/style.css
-# Copy the contents from the artifacts above
 ```
 
 ### 2. Build and run with Docker Compose
@@ -68,30 +94,108 @@ http://localhost:8080
 
 ## Usage 💡
 
-1. Enter a TikTok username in the input field (e.g., `@isaackogz`)
-2. Click "Connect" or press Enter
-3. Watch live events stream in real-time!
+### For Game Master
 
-## Event Types 🎭
+1. Enter TikTok username (e.g., `@isaackogz`)
+2. Click **Connect**
+3. Game automatically starts with random number
+4. Monitor guesses and leaderboard
+5. Click **Reset Game** to start fresh round
+6. Watch for winner celebration!
 
-The viewer displays the following events:
+### For Viewers
 
-- 💬 **Comments**: User messages in the chat
-- 🎁 **Gifts**: Virtual gifts sent to the streamer
-- ❤️ **Likes**: Likes given to the stream
-- 👤 **Follows**: New followers
-- 📤 **Shares**: Stream shares
-- 👋 **Joins**: Users joining the stream
-- ℹ️ **System**: Connection status messages
+1. Comment single words in TikTok LIVE chat
+2. See your guess appear with distance
+3. Try to get distance to 0
+4. Send gifts to help everyone with hints!
 
-## Environment Variables 🔧
+## Game Rules 📜
 
-You can customize the default TikTok username by modifying the `docker-compose.yml`:
+### Valid Guesses
 
-```yaml
-environment:
-  - TIKTOK_USERNAME=@your_username_here
+- ✅ Only letters (A-Z) allowed
+- ✅ First sentence of comment is used
+- ✅ Each word can only be guessed once
+- ✅ Minimum 2 characters
+- ❌ Numbers, symbols, emoji removed
+
+### Hint System
+
+- 🎁 Any gift triggers hint
+- 💡 Hint word is at half the lowest distance
+- 🎯 Helps narrow down the search area
+
+## Technical Details 🔬
+
+### API Integration
+
+**Contexto Game API**:
+- Game endpoint: `https://api.contexto.me/machado/en/game/{game_no}/{word}`
+- Tip endpoint: `https://api.contexto.me/machado/en/tip/{game_no}/{distance}`
+- 2-second timeout per request
+- Validates response format
+
+### Profile Pictures
+
+- Fetched using TikTokLive's `web.fetch_image_data()`
+- Converted to base64 data URLs
+- Cached per user
+- Fallback to initials if fetch fails
+
+### Performance
+
+**Optimized for**:
+- ⚡ Async API calls (non-blocking)
+- 🧠 In-memory game state
+- 🎨 Smooth CSS animations
+- 📦 Minimal data transfer
+
+**Resource Usage**:
+- Memory: ~50-100MB
+- CPU: Low (event-driven)
+- Network: ~2KB per guess
+
+## UI Layout 🎨
+
 ```
+┌──────────────┬────────────────────┬──────────────┐
+│   Controls   │    Game Board      │  Info & Hints│
+│   & Social   │                    │              │
+│              │  GAME: #1234       │  How to Play │
+│  Connect     │  GUESSES: 15       │              │
+│  Disconnect  │                    │  🟢 Close    │
+│  Reset Game  │  [type a word]     │  🟠 Medium   │
+│              │                    │  🔴 Far      │
+│  Follow/     │  ┌──────────────┐  │              │
+│  Share       │  │ User1  word  │  │  💡 Hints    │
+│  Events      │  │ 🟢        125│  │              │
+│              │  ├──────────────┤  │  word1 (50)  │
+│  Error Log   │  │ User2  test  │  │  word2 (125) │
+│              │  │ 🟠       1024│  │              │
+└──────────────┴────────────────────┴──────────────┘
+```
+
+## Winner Modal 🏆
+
+When distance reaches 0:
+```
+┌─────────────────────────────┐
+│         🎉 WINNER! 🎉        │
+│                             │
+│       [Profile Picture]      │
+│       Username Here          │
+│       "target_word"          │
+│                             │
+│      🏆 Top 3 Guesses       │
+│                             │
+│  #1  [pfp]  User1  word  0  │
+│  #2  [pfp]  User2  test  125│
+│  #3  [pfp]  User3  code  340│
+└─────────────────────────────┘
+```
+
+Auto-closes after 10 seconds or click **[X]**
 
 ## Development 🛠️
 
@@ -105,16 +209,13 @@ pip install -r requirements.txt
 python app.py
 ```
 
-### Modify the UI
+### Modify Styling
 
-Edit `templates/index.html` to customize the appearance. The container has volume mounts, so changes will reflect immediately.
-
-## Technical Details 🔬
-
-- **Backend**: Python 3.12 with aiohttp and TikTokLive
-- **Frontend**: Vanilla JavaScript with WebSocket API
-- **Styling**: Modern CSS with gradients and animations
-- **Architecture**: WebSocket-based real-time communication
+Edit `static/style.css` to customize:
+- Color schemes
+- Animations
+- Layout spacing
+- Font sizes
 
 ## Troubleshooting 🔧
 
@@ -130,36 +231,62 @@ docker-compose build --no-cache
 docker-compose up
 ```
 
-### Can't connect to TikTok stream
+### API Issues
 
-- Ensure the username is correct and the user is currently live
-- Check if the user's stream is public
-- TikTok may have rate limits - try again after a few minutes
+- Contexto API is external and may have rate limits
+- Check console for API error messages
+- Invalid words return no response (ignored)
 
-### WebSocket connection fails
+### Profile Pictures Not Showing
 
-- Check if port 8080 is available
-- Ensure your firewall allows connections on port 8080
+- Requires active TikTok connection
+- Some users may have privacy settings
+- Fallback initials always work
 
-## Stopping the Application 🛑
+### Game Reset Not Working
 
-```bash
-# Stop the container
-docker-compose down
+- Ensure WebSocket is connected
+- Check browser console for errors
+- Refresh page if needed
 
-# Stop and remove volumes
-docker-compose down -v
+## Advanced Features 🎯
+
+### Game Number Selection
+
+Currently random (1-1184). To use specific game:
+
+```python
+# In app.py, modify init_new_game():
+game_state['game_number'] = 42  # Your game number
 ```
+
+### Custom Hint Logic
+
+```python
+# In on_gift(), modify:
+hint_distance = max(1, lowest_distance // 3)  # Divide by 3 instead
+```
+
+### Persistent Leaderboard
+
+Add storage to track all-time best guesses across games.
 
 ## License 📄
 
-This project uses the TikTokLive library which is MIT licensed.
+This project uses:
+- TikTokLive (MIT License)
+- Contexto API (Public)
 
 ## Credits 🙏
 
 - [TikTokLive](https://github.com/isaackogan/TikTokLive) by Isaac Kogan
+- [Contexto](https://contexto.me/) for the word game concept
 - Built with ❤️ using Python and modern web technologies
 
 ## Disclaimer ⚠️
 
-This is an unofficial project and is not affiliated with TikTok. Use responsibly and respect TikTok's terms of service.
+This is an unofficial project and is not affiliated with TikTok or Contexto. Use responsibly and respect their terms of service.
+
+---
+
+**Have fun guessing! May the closest word win! 🎉**

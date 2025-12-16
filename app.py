@@ -1,13 +1,15 @@
 import asyncio
 import json
 import os
+import re
 from typing import Set
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSMsgType, ClientSession
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import (
-    ConnectEvent, CommentEvent, GiftEvent, LikeEvent,
-    FollowEvent, ShareEvent, JoinEvent, DisconnectEvent
+    ConnectEvent, CommentEvent, GiftEvent,
+    FollowEvent, ShareEvent, DisconnectEvent
 )
+import random
 
 # Store connected WebSocket clients
 websocket_clients: Set[web.WebSocketResponse] = set()
@@ -15,13 +17,28 @@ websocket_clients: Set[web.WebSocketResponse] = set()
 # TikTok client instance
 tiktok_client = None
 
+# Game state
+game_state = {
+    'game_number': None,
+    'guesses': {},  # word -> {distance, user, nickname, avatar_url}
+    'guessed_words': set()
+}
+
+
+def init_new_game():
+    """Initialize a new game"""
+    game_state['game_number'] = random.randint(1, 1184)
+    game_state['guesses'] = {}
+    game_state['guessed_words'] = set()
+    print(f"🎮 New game started! Game #{game_state['game_number']}")
+    return game_state['game_number']
+
 
 async def broadcast_to_clients(event_data: dict):
     """Send event data to all connected WebSocket clients"""
     if not websocket_clients:
         return
     
-    # Remove disconnected clients
     disconnected = set()
     for ws in websocket_clients:
         try:
@@ -32,12 +49,62 @@ async def broadcast_to_clients(event_data: dict):
     websocket_clients.difference_update(disconnected)
 
 
+async def fetch_contexto_api(game_no: int, word: str):
+    """Fetch distance from Contexto API"""
+    try:
+        url = f"https://api.contexto.me/machado/en/game/{game_no}/{word}"
+        async with ClientSession() as session:
+            async with session.get(url, timeout=2) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if 'distance' in data and 'word' in data:
+                        return data
+        return None
+    except Exception as e:
+        print(f"Error fetching Contexto API: {e}")
+        return None
+
+
+async def fetch_contexto_tip(game_no: int, distance: int):
+    """Fetch tip from Contexto API"""
+    try:
+        url = f"https://api.contexto.me/machado/en/tip/{game_no}/{distance}"
+        async with ClientSession() as session:
+            async with session.get(url, timeout=2) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('word')
+        return None
+    except Exception as e:
+        print(f"Error fetching Contexto tip: {e}")
+        return None
+
+
+def clean_word(text: str) -> str:
+    """Clean word to only contain A-Z letters"""
+    # Get first sentence (split by . ! ?)
+    first_sentence = re.split(r'[.!?]', text)[0].strip()
+    # Remove all non-letter characters and convert to lowercase
+    cleaned = re.sub(r'[^a-zA-Z]', '', first_sentence).lower()
+    return cleaned
+
+
 async def on_connect(event: ConnectEvent):
     """Handle TikTok connection event"""
     print(f"✅ Connected to @{event.unique_id}")
+    
+    # Initialize new game on connect
+    game_no = init_new_game()
+    
     await broadcast_to_clients({
         'type': 'system',
         'message': f'Connected to @{event.unique_id}',
+        'timestamp': asyncio.get_event_loop().time()
+    })
+    
+    await broadcast_to_clients({
+        'type': 'game_start',
+        'game_number': game_no,
         'timestamp': asyncio.get_event_loop().time()
     })
 
@@ -53,12 +120,23 @@ async def on_disconnect(event: DisconnectEvent):
 
 
 async def on_comment(event: CommentEvent):
-    """Handle comment events"""
+    """Handle comment events - main game logic"""
     try:
-        # Get profile picture URL using TikTokLive's web client
+        # Clean the word
+        word = clean_word(event.comment)
+        
+        # Validate word
+        if not word or len(word) < 2:
+            return
+        
+        # Check if already guessed
+        if word in game_state['guessed_words']:
+            print(f"⚠️ Word '{word}' already guessed, ignoring")
+            return
+        
+        # Get profile picture
         avatar_url = None
         try:
-            # Fetch image data and convert to base64
             if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
                 image_bytes = await tiktok_client.web.fetch_image_data(
                     image=event.user.avatar_thumb
@@ -67,111 +145,132 @@ async def on_comment(event: CommentEvent):
                     import base64
                     avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
         except Exception as img_error:
-            print(f"Error fetching avatar for {event.user.nickname}: {img_error}")
+            print(f"Error fetching avatar: {img_error}")
         
-        # print(f"💬 {event.user.nickname}: {event.comment}")
+        # Show popup notification
         await broadcast_to_clients({
-            'type': 'comment',
+            'type': 'guess_notification',
             'user': event.user.nickname,
-            'user_id': event.user.unique_id,
-            'message': event.comment,
-            'avatar_url': avatar_url,
+            'word': word,
             'timestamp': asyncio.get_event_loop().time()
         })
+        
+        # Fetch from Contexto API
+        print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
+        result = await fetch_contexto_api(game_state['game_number'], word)
+        
+        if not result:
+            print(f"❌ Failed to get valid response for '{word}'")
+            return
+        
+        distance = result['distance']
+        
+        # Add to guessed words
+        game_state['guessed_words'].add(word)
+        
+        # Store guess
+        game_state['guesses'][word] = {
+            'distance': distance,
+            'user': event.user.nickname,
+            'user_id': event.user.unique_id,
+            'avatar_url': avatar_url
+        }
+        
+        print(f"📊 {event.user.nickname} guessed '{word}' - Distance: {distance}")
+        
+        # Check for winner
+        if distance == 0:
+            print(f"🎉 WINNER! {event.user.nickname} guessed '{word}'!")
+            
+            # Get top 3 guesses
+            sorted_guesses = sorted(
+                game_state['guesses'].items(),
+                key=lambda x: x[1]['distance']
+            )[:3]
+            
+            leaderboard = [
+                {
+                    'word': word,
+                    'user': data['user'],
+                    'distance': data['distance'],
+                    'avatar_url': data['avatar_url']
+                }
+                for word, data in sorted_guesses
+            ]
+            
+            await broadcast_to_clients({
+                'type': 'winner',
+                'word': word,
+                'user': event.user.nickname,
+                'avatar_url': avatar_url,
+                'leaderboard': leaderboard,
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            
+            # Start new game after 10 seconds
+            await asyncio.sleep(10)
+            game_no = init_new_game()
+            await broadcast_to_clients({
+                'type': 'game_start',
+                'game_number': game_no,
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            
+        else:
+            # Broadcast guess update
+            await broadcast_to_clients({
+                'type': 'guess_update',
+                'guesses': game_state['guesses'],
+                'timestamp': asyncio.get_event_loop().time()
+            })
+        
     except Exception as e:
         print(f"Error in on_comment: {e}")
 
 
 async def on_gift(event: GiftEvent):
-    """Handle gift events"""
+    """Handle gift events - provide hint"""
     try:
-        # Try different attribute paths for gift name
-        gift_name = getattr(event.gift, 'name', None) or \
-                    getattr(getattr(event.gift, 'info', None), 'name', 'Unknown Gift') or \
-                    'Unknown Gift'
-        
-        # Get profile picture using TikTokLive's web client
-        avatar_url = None
-        try:
-            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
-                image_bytes = await tiktok_client.web.fetch_image_data(
-                    image=event.user.avatar_thumb
-                )
-                if image_bytes:
-                    import base64
-                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:
-            print(f"Error fetching avatar for gift from {event.user.nickname}: {img_error}")
-        
-        # Check if gift is repeatable
+        # Only process if gift streak ended
         is_repeatable = getattr(event.gift, 'streakable', False)
         is_streaking = getattr(event, 'streaking', True)
-        repeat_count = getattr(event, 'repeat_count', 1)
         
-        # Only send when streak ends or it's a non-streakable gift
-        if is_repeatable and not is_streaking:
-            # print(f"🎁 {event.user.nickname} sent {repeat_count}x {gift_name}")
+        if is_repeatable and is_streaking:
+            return
+        
+        # Get lowest distance
+        if not game_state['guesses']:
+            print("🎁 Gift received but no guesses yet")
+            return
+        
+        lowest = min(game_state['guesses'].items(), key=lambda x: x[1]['distance'])
+        lowest_distance = lowest[1]['distance']
+        
+        # Calculate hint distance
+        hint_distance = max(1, lowest_distance // 2)
+        
+        print(f"🎁 Gift received! Getting hint for distance {hint_distance}")
+        
+        # Fetch tip
+        tip_word = await fetch_contexto_tip(game_state['game_number'], hint_distance)
+        
+        if tip_word:
             await broadcast_to_clients({
-                'type': 'gift',
-                'user': event.user.nickname,
-                'gift_name': gift_name,
-                'count': repeat_count,
-                'avatar_url': avatar_url,
+                'type': 'hint',
+                'word': tip_word,
+                'distance': hint_distance,
+                'gifter': event.user.nickname,
                 'timestamp': asyncio.get_event_loop().time()
             })
-        elif not is_repeatable:
-            # print(f"🎁 {event.user.nickname} sent {gift_name}")
-            await broadcast_to_clients({
-                'type': 'gift',
-                'user': event.user.nickname,
-                'gift_name': gift_name,
-                'count': 1,
-                'avatar_url': avatar_url,
-                'timestamp': asyncio.get_event_loop().time()
-            })
+            print(f"💡 Hint revealed: '{tip_word}' at distance {hint_distance}")
+        
     except Exception as e:
         print(f"Error in on_gift: {e}")
-
-
-async def on_like(event: LikeEvent):
-    """Handle like events"""
-    try:
-        # Try to get total likes, fallback to likes count
-        total_likes = getattr(event, 'total_likes', getattr(event, 'likes', 0))
-        likes = getattr(event, 'likes', 1)
-        
-        # print(f"❤️ {event.user.nickname} liked ({total_likes} total)")
-        
-        # Get profile picture using TikTokLive's web client
-        avatar_url = None
-        try:
-            if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
-                image_bytes = await tiktok_client.web.fetch_image_data(
-                    image=event.user.avatar_thumb
-                )
-                if image_bytes:
-                    import base64
-                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:
-            print(f"Error fetching avatar for like from {event.user.nickname}: {img_error}")
-        
-        await broadcast_to_clients({
-            'type': 'like',
-            'user': event.user.nickname,
-            'user_id': event.user.unique_id,
-            'likes': likes,
-            'total_likes': total_likes,
-            'avatar_url': avatar_url,
-            'timestamp': asyncio.get_event_loop().time()
-        })
-    except Exception as e:
-        print(f"Error in on_like: {e}")
 
 
 async def on_follow(event: FollowEvent):
     """Handle follow events"""
     try:
-        # Get profile picture using TikTokLive's web client
         avatar_url = None
         try:
             if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
@@ -181,10 +280,10 @@ async def on_follow(event: FollowEvent):
                 if image_bytes:
                     import base64
                     avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:
-            print(f"Error fetching avatar for follow from {event.user.nickname}: {img_error}")
+        except Exception:
+            pass
         
-        # print(f"👤 {event.user.nickname} followed!")
+        print(f"👤 {event.user.nickname} followed!")
         await broadcast_to_clients({
             'type': 'follow',
             'user': event.user.nickname,
@@ -198,7 +297,7 @@ async def on_follow(event: FollowEvent):
 async def on_share(event: ShareEvent):
     """Handle share events"""
     try:
-        # print(f"📤 {event.user.nickname} shared the stream!")
+        print(f"📤 {event.user.nickname} shared the stream!")
         await broadcast_to_clients({
             'type': 'share',
             'user': event.user.nickname,
@@ -206,19 +305,6 @@ async def on_share(event: ShareEvent):
         })
     except Exception as e:
         print(f"Error in on_share: {e}")
-
-
-async def on_join(event: JoinEvent):
-    """Handle join events"""
-    try:
-        # print(f"👋 {event.user.nickname} joined!")
-        await broadcast_to_clients({
-            'type': 'join',
-            'user': event.user.nickname,
-            'timestamp': asyncio.get_event_loop().time()
-        })
-    except Exception as e:
-        print(f"Error in on_join: {e}")
 
 
 async def websocket_handler(request):
@@ -229,10 +315,11 @@ async def websocket_handler(request):
     websocket_clients.add(ws)
     print(f"🔌 New WebSocket connection (Total: {len(websocket_clients)})")
     
-    # Send welcome message
+    # Send current game state
     await ws.send_json({
-        'type': 'system',
-        'message': 'Connected to viewer',
+        'type': 'game_state',
+        'game_number': game_state['game_number'],
+        'guesses': game_state['guesses'],
         'timestamp': asyncio.get_event_loop().time()
     })
     
@@ -241,12 +328,18 @@ async def websocket_handler(request):
             if msg.type == WSMsgType.TEXT:
                 data = json.loads(msg.data)
                 
-                # Handle client messages
                 if data.get('action') == 'connect':
                     username = data.get('username', '@isaackogz')
                     await connect_to_tiktok(username)
                 elif data.get('action') == 'disconnect':
                     await disconnect_from_tiktok()
+                elif data.get('action') == 'reset_game':
+                    game_no = init_new_game()
+                    await broadcast_to_clients({
+                        'type': 'game_start',
+                        'game_number': game_no,
+                        'timestamp': asyncio.get_event_loop().time()
+                    })
                     
             elif msg.type == WSMsgType.ERROR:
                 print(f'WebSocket error: {ws.exception()}')
@@ -262,11 +355,9 @@ async def connect_to_tiktok(username: str):
     global tiktok_client
     
     try:
-        # Disconnect existing client
         if tiktok_client and tiktok_client.connected:
             await tiktok_client.disconnect()
         
-        # Send connecting status
         await broadcast_to_clients({
             'type': 'status',
             'status': 'connecting',
@@ -274,20 +365,15 @@ async def connect_to_tiktok(username: str):
             'timestamp': asyncio.get_event_loop().time()
         })
         
-        # Create new client
         tiktok_client = TikTokLiveClient(unique_id=username)
         
-        # Add event listeners
         tiktok_client.add_listener(ConnectEvent, on_connect)
         tiktok_client.add_listener(DisconnectEvent, on_disconnect)
         tiktok_client.add_listener(CommentEvent, on_comment)
         tiktok_client.add_listener(GiftEvent, on_gift)
-        tiktok_client.add_listener(LikeEvent, on_like)
         tiktok_client.add_listener(FollowEvent, on_follow)
         tiktok_client.add_listener(ShareEvent, on_share)
-        tiktok_client.add_listener(JoinEvent, on_join)
         
-        # Check if user is live before connecting
         is_live = await tiktok_client.is_live()
         
         if not is_live:
@@ -299,7 +385,6 @@ async def connect_to_tiktok(username: str):
             })
             return
         
-        # Start connection in background
         asyncio.create_task(tiktok_client.start())
         
     except Exception as e:
@@ -350,9 +435,9 @@ async def css_handler(request):
 
 async def start_background_tasks(app):
     """Start background tasks on app startup"""
-    # Don't auto-connect on startup
-    print("🚀 Server started. Waiting for manual connection...")
-    pass
+    print("🚀 Server started. Ready for Contexto game!")
+    # Initialize game but don't connect
+    init_new_game()
 
 
 async def cleanup_background_tasks(app):
@@ -365,17 +450,14 @@ async def cleanup_background_tasks(app):
 def main():
     app = web.Application()
     
-    # Add routes
     app.router.add_get('/', index_handler)
     app.router.add_get('/static/style.css', css_handler)
     app.router.add_get('/ws', websocket_handler)
     
-    # Add startup/shutdown handlers
     app.on_startup.append(start_background_tasks)
     app.on_cleanup.append(cleanup_background_tasks)
     
-    # Run the app
-    print("🚀 Starting TikTok Live Viewer on http://localhost:8080")
+    print("🚀 Starting TikTok Live Contexto Game on http://localhost:8080")
     web.run_app(app, host='0.0.0.0', port=8080)
 
 

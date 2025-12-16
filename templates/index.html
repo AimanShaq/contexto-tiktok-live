@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Live Viewer</title>
+    <title>TikTok Live Contexto Game</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="container">
-        <!-- LEFT COLUMN: CONTROLS & ERRORS -->
+        <!-- LEFT COLUMN: CONTROLS & EVENTS -->
         <div class="left-column">
             <div class="control-panel">
                 <div class="panel-title">
@@ -33,8 +33,23 @@
                 </button>
 
                 <div class="form-group" style="margin-top: 24px;">
-                    <label class="form-label">Settings</label>
-                    <p style="font-size: 0.85rem; color: #9ca3af;">More settings coming soon...</p>
+                    <button class="btn btn-warning" onclick="resetGame()">
+                        🔄 Reset Game
+                    </button>
+                </div>
+            </div>
+
+            <!-- Share & Follow Events -->
+            <div class="event-panel">
+                <div class="event-panel-header header-social">
+                    <span>🎉 Social Events</span>
+                    <span class="event-counter" id="social-count">0</span>
+                </div>
+                <div class="event-list social-list" id="social-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="font-size: 2rem;">🤝</div>
+                        <div style="font-size: 0.85rem;">No activity yet</div>
+                    </div>
                 </div>
             </div>
 
@@ -46,94 +61,79 @@
             </div>
         </div>
 
-        <!-- MIDDLE COLUMN: CHAT -->
+        <!-- MIDDLE COLUMN: GAME -->
         <div class="middle-column">
-            <div class="chat-header">
-                <h1>💬 Live Chat</h1>
-                <p class="chat-subtitle">Latest 20 messages</p>
+            <div class="game-header">
+                <div class="game-title">
+                    <span class="game-label">GAME: #</span>
+                    <span class="game-number" id="game-number">----</span>
+                </div>
+                <div class="game-guesses">
+                    <span class="guesses-label">GUESSES:</span>
+                    <span class="guesses-count" id="guesses-count">0</span>
+                </div>
             </div>
-            <div class="chat-container" id="chat-container">
+
+            <div class="game-input-area">
+                <input type="text" class="game-input" placeholder="type a word" readonly>
+            </div>
+
+            <!-- Notification Area -->
+            <div class="notification-popup" id="notification-popup"></div>
+
+            <!-- Guesses Container -->
+            <div class="guesses-container" id="guesses-container">
                 <div class="empty-state">
-                    <div class="empty-state-icon">💭</div>
-                    <div>Waiting for chat messages...</div>
+                    <div class="empty-state-icon">🎯</div>
+                    <div>Waiting for guesses...</div>
                 </div>
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: EVENTS -->
+        <!-- RIGHT COLUMN: HINTS & INFO -->
         <div class="right-column">
-            <!-- Notifications (Join only) -->
-            <div class="event-panel">
-                <div class="event-panel-header header-notifications">
-                    <span>👋 Join Notifications</span>
-                    <span class="event-counter" id="join-count">0</span>
-                </div>
-                <div class="notification-area" id="notification-area">
-                    <div class="empty-state" style="position: static;">
-                        <div class="empty-state-icon" style="font-size: 3rem;">🔕</div>
-                        <div style="font-size: 0.9rem;">No one joined yet</div>
-                    </div>
+            <div class="info-panel">
+                <div class="info-header">📖 How to Play</div>
+                <div class="info-content">
+                    <p>🎯 Comment words to guess the secret word!</p>
+                    <p>🟢 Green (≤499): Very close!</p>
+                    <p>🟠 Orange (500-1500): Getting there</p>
+                    <p>🔴 Red (>1500): Far away</p>
+                    <p>🎁 Send gifts for hints!</p>
                 </div>
             </div>
 
-            <!-- Likes Ranking -->
-            <div class="event-panel">
-                <div class="event-panel-header header-likes">
-                    <span>❤️ Top Likers</span>
-                    <span class="event-counter" id="likes-count">0</span>
-                </div>
-                <div class="event-list" id="likes-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon" style="font-size: 3rem;">💖</div>
-                        <div style="font-size: 0.9rem;">No likes yet</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Gifts -->
-            <div class="event-panel">
-                <div class="event-panel-header header-gifts">
-                    <span>🎁 Gifts</span>
-                    <span class="event-counter" id="gifts-count">0</span>
-                </div>
-                <div class="event-list" id="gifts-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon" style="font-size: 3rem;">🎀</div>
-                        <div style="font-size: 0.9rem;">No gifts yet</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Follows -->
-            <div class="event-panel">
-                <div class="event-panel-header header-follows">
-                    <span>👥 New Followers</span>
-                    <span class="event-counter" id="follows-count">0</span>
-                </div>
-                <div class="event-list" id="follows-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon" style="font-size: 3rem;">👋</div>
-                        <div style="font-size: 0.9rem;">No followers yet</div>
+            <div class="hints-panel">
+                <div class="hints-header">💡 Hints</div>
+                <div class="hints-list" id="hints-list">
+                    <div class="empty-state" style="padding: 30px 20px;">
+                        <div class="empty-state-icon" style="font-size: 2.5rem;">🔮</div>
+                        <div style="font-size: 0.9rem;">Send gifts for hints!</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Winner Modal -->
+    <div class="winner-modal" id="winner-modal">
+        <div class="winner-content">
+            <button class="close-modal" onclick="closeWinnerModal()">✕</button>
+            <div class="winner-title">🎉 WINNER! 🎉</div>
+            <div class="winner-info">
+                <div class="winner-avatar" id="winner-avatar"></div>
+                <div class="winner-name" id="winner-name"></div>
+                <div class="winner-word" id="winner-word"></div>
+            </div>
+            <div class="leaderboard-title">🏆 Top 3 Guesses</div>
+            <div class="leaderboard" id="leaderboard"></div>
+        </div>
+    </div>
+
     <script>
         let ws = null;
         let isConnected = false;
-        const MAX_CHAT_MESSAGES = 20;
-        let notificationTimeouts = [];
-        let counters = {
-            join: 0,
-            likes: 0,
-            gifts: 0,
-            follows: 0
-        };
-        
-        // Track likes per user for ranking
-        let likeRanking = new Map(); // userId -> {user, likes, avatar_url}
+        let socialCount = 0;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -189,9 +189,6 @@
 
         function addError(message) {
             const errorList = document.getElementById('error-list');
-            const emptyState = errorList.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
             const errorItem = document.createElement('div');
             errorItem.className = 'error-item';
             
@@ -208,34 +205,29 @@
             }
         }
 
-        function updateCounter(type, value) {
-            counters[type] = value || counters[type] + 1;
-            const counterId = type + '-count';
-            const counter = document.getElementById(counterId);
-            if (counter) {
-                counter.textContent = counters[type];
-            }
-        }
-
         function handleEvent(data) {
             switch(data.type) {
-                case 'comment':
-                    addChatMessage(data);
+                case 'game_state':
+                case 'game_start':
+                    initGame(data);
                     break;
-                case 'gift':
-                    addGift(data);
+                case 'guess_notification':
+                    showGuessNotification(data);
+                    break;
+                case 'guess_update':
+                    updateGuesses(data.guesses);
+                    break;
+                case 'winner':
+                    showWinner(data);
+                    break;
+                case 'hint':
+                    addHint(data);
                     break;
                 case 'follow':
-                    addFollow(data);
-                    break;
-                case 'join':
-                    addJoinNotification(data);
-                    break;
-                case 'like':
-                    addLikeRanking(data);
+                    addSocialEvent(data, 'follow');
                     break;
                 case 'share':
-                    // Ignore shares for now
+                    addSocialEvent(data, 'share');
                     break;
                 case 'status':
                     if (data.status === 'connecting') {
@@ -256,246 +248,154 @@
             }
         }
 
-        function createAvatar(user, avatarUrl) {
-            const avatarEl = document.createElement('div');
-            avatarEl.className = 'chat-avatar';
+        function initGame(data) {
+            document.getElementById('game-number').textContent = data.game_number || '----';
+            document.getElementById('guesses-count').textContent = '0';
             
-            if (avatarUrl) {
-                const img = document.createElement('img');
-                img.src = avatarUrl;
-                img.alt = user;
-                img.onerror = function() {
-                    // Fallback to initial if image fails
-                    avatarEl.innerHTML = user.charAt(0).toUpperCase();
-                };
-                avatarEl.appendChild(img);
-            } else {
-                avatarEl.textContent = user.charAt(0).toUpperCase();
-            }
-            
-            return avatarEl;
-        }
-
-        function addChatMessage(data) {
-            const container = document.getElementById('chat-container');
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const messageEl = document.createElement('div');
-            messageEl.className = 'chat-message';
-
-            const avatarEl = createAvatar(data.user, data.avatar_url);
-            
-            const contentEl = document.createElement('div');
-            contentEl.className = 'chat-content';
-            contentEl.innerHTML = `
-                <div class="chat-username">${escapeHtml(data.user)}</div>
-                <div class="chat-text">${escapeHtml(data.message)}</div>
-            `;
-
-            const iconEl = document.createElement('div');
-            iconEl.className = 'chat-icon';
-            iconEl.textContent = '💬';
-
-            messageEl.appendChild(avatarEl);
-            messageEl.appendChild(contentEl);
-            messageEl.appendChild(iconEl);
-
-            container.insertBefore(messageEl, container.firstChild);
-
-            while (container.children.length > MAX_CHAT_MESSAGES) {
-                container.removeChild(container.lastChild);
-            }
-        }
-
-        function addGift(data) {
-            const container = document.getElementById('gifts-list');
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const giftEl = document.createElement('div');
-            giftEl.className = 'event-item event-item-gift';
-            
-            const avatarEl = document.createElement('div');
-            avatarEl.className = 'event-item-avatar';
-            if (data.avatar_url) {
-                const img = document.createElement('img');
-                img.src = data.avatar_url;
-                img.alt = data.user;
-                img.onerror = function() {
-                    avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
-                };
-                avatarEl.appendChild(img);
-            } else {
-                avatarEl.textContent = data.user.charAt(0).toUpperCase();
-            }
-
-            const contentEl = document.createElement('div');
-            contentEl.className = 'event-item-content';
-            contentEl.innerHTML = `
-                <div class="event-item-user">${escapeHtml(data.user)}</div>
-                <div class="event-item-detail">${data.count}x ${escapeHtml(data.gift_name)}</div>
-            `;
-
-            giftEl.appendChild(avatarEl);
-            giftEl.appendChild(contentEl);
-
-            container.insertBefore(giftEl, container.firstChild);
-            updateCounter('gifts');
-
-            while (container.children.length > 50) {
-                container.removeChild(container.lastChild);
-            }
-        }
-
-        function addFollow(data) {
-            const container = document.getElementById('follows-list');
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const followEl = document.createElement('div');
-            followEl.className = 'event-item event-item-follow';
-            
-            const avatarEl = document.createElement('div');
-            avatarEl.className = 'event-item-avatar';
-            if (data.avatar_url) {
-                const img = document.createElement('img');
-                img.src = data.avatar_url;
-                img.alt = data.user;
-                img.onerror = function() {
-                    avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
-                };
-                avatarEl.appendChild(img);
-            } else {
-                avatarEl.textContent = data.user.charAt(0).toUpperCase();
-            }
-
-            const contentEl = document.createElement('div');
-            contentEl.className = 'event-item-content';
-            contentEl.innerHTML = `
-                <div class="event-item-user">${escapeHtml(data.user)}</div>
-                <div class="event-item-detail">Started following</div>
-            `;
-
-            followEl.appendChild(avatarEl);
-            followEl.appendChild(contentEl);
-
-            container.insertBefore(followEl, container.firstChild);
-            updateCounter('follows');
-
-            while (container.children.length > 50) {
-                container.removeChild(container.lastChild);
-            }
-        }
-
-        function addNotification(data) {
-            const container = document.getElementById('notification-area');
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const existing = container.querySelectorAll('.notification-toast');
-            existing.forEach(el => el.remove());
-            notificationTimeouts.forEach(timeout => clearTimeout(timeout));
-            notificationTimeouts = [];
-
-            const toastEl = document.createElement('div');
-            let icon, className, message;
-
-            switch(data.type) {
-                case 'join':
-                    icon = '👋';
-                    className = 'toast-join';
-                    message = `liked (${data.total_likes} total)`;
-                    break;
-                case 'share':
-                    icon = '📤';
-                    className = 'toast-share';
-                    message = 'shared the stream';
-                    break;
-                case 'like':
-                    icon = '❤️';
-                    className = 'toast-like';
-                    message = `liked (${data.total_likes} total)`;
-                    break;
-            }
-
-            toastEl.className = `notification-toast ${className}`;
-            toastEl.innerHTML = `
-                <div class="toast-icon">${icon}</div>
-                <div class="toast-content">
-                    <div class="toast-user">${escapeHtml(data.user)}</div>
-                    <div class="toast-message">${message}</div>
+            // Clear guesses
+            const container = document.getElementById('guesses-container');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🎯</div>
+                    <div>Waiting for guesses...</div>
                 </div>
             `;
-
-            container.appendChild(toastEl);
-            updateCounter('notifications');
-
-            const timeout = setTimeout(() => {
-                toastEl.remove();
-            }, 3000);
-            notificationTimeouts.push(timeout);
-        }
-
-        function addJoinNotification(data) {
-            const container = document.getElementById('notification-area');
-            const emptyState = container.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            // Clear existing notifications
-            const existing = container.querySelectorAll('.notification-toast');
-            existing.forEach(el => el.remove());
-            notificationTimeouts.forEach(timeout => clearTimeout(timeout));
-            notificationTimeouts = [];
-
-            const toastEl = document.createElement('div');
-            toastEl.className = 'notification-toast toast-join';
-            toastEl.innerHTML = `
-                <div class="toast-icon">👋</div>
-                <div class="toast-content">
-                    <div class="toast-user">${escapeHtml(data.user)}</div>
-                    <div class="toast-message">joined the stream</div>
+            
+            // Clear hints
+            const hintsContainer = document.getElementById('hints-list');
+            hintsContainer.innerHTML = `
+                <div class="empty-state" style="padding: 30px 20px;">
+                    <div class="empty-state-icon" style="font-size: 2.5rem;">🔮</div>
+                    <div style="font-size: 0.9rem;">Send gifts for hints!</div>
                 </div>
             `;
-
-            container.appendChild(toastEl);
-            updateCounter('join');
-
-            const timeout = setTimeout(() => {
-                toastEl.remove();
-            }, 3000);
-            notificationTimeouts.push(timeout);
+            
+            if (data.guesses && Object.keys(data.guesses).length > 0) {
+                updateGuesses(data.guesses);
+            }
         }
 
-        function addLikeRanking(data) {
-            // Update ranking map
-            const userId = data.user_id;
-            if (likeRanking.has(userId)) {
-                const existing = likeRanking.get(userId);
-                existing.likes += data.likes;
-            } else {
-                likeRanking.set(userId, {
-                    user: data.user,
-                    likes: data.likes,
-                    avatar_url: data.avatar_url
-                });
-            }
+        function showGuessNotification(data) {
+            const popup = document.getElementById('notification-popup');
+            popup.textContent = `${data.user} guessed: ${data.word}`;
+            popup.classList.add('show');
+            
+            setTimeout(() => {
+                popup.classList.remove('show');
+            }, 3000);
+        }
 
-            // Sort by likes descending
-            const sorted = Array.from(likeRanking.values())
-                .sort((a, b) => b.likes - a.likes)
-                .slice(0, 10); // Keep top 10
+        function getDistanceColor(distance) {
+            if (distance <= 499) return 'green';
+            if (distance <= 1500) return 'orange';
+            return 'red';
+        }
 
-            // Clear and rebuild list
-            const container = document.getElementById('likes-list');
+        function updateGuesses(guesses) {
+            const container = document.getElementById('guesses-container');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+            
+            // Sort by distance
+            const sorted = Object.entries(guesses).sort((a, b) => a[1].distance - b[1].distance);
+            
+            // Update count
+            document.getElementById('guesses-count').textContent = sorted.length;
+            
+            // Clear and rebuild
             container.innerHTML = '';
+            
+            sorted.forEach(([word, data]) => {
+                const guessEl = document.createElement('div');
+                guessEl.className = `guess-item color-${getDistanceColor(data.distance)}`;
+                
+                // Avatar
+                const avatarEl = document.createElement('div');
+                avatarEl.className = 'guess-avatar';
+                if (data.avatar_url) {
+                    const img = document.createElement('img');
+                    img.src = data.avatar_url;
+                    img.alt = data.user;
+                    img.onerror = function() {
+                        avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
+                    };
+                    avatarEl.appendChild(img);
+                } else {
+                    avatarEl.textContent = data.user.charAt(0).toUpperCase();
+                }
+                
+                // Content
+                const contentEl = document.createElement('div');
+                contentEl.className = 'guess-content';
+                contentEl.innerHTML = `
+                    <div class="guess-user">${escapeHtml(data.user)}</div>
+                    <div class="guess-word">${escapeHtml(word)}</div>
+                `;
+                
+                // Distance
+                const distanceEl = document.createElement('div');
+                distanceEl.className = 'guess-distance';
+                distanceEl.textContent = data.distance;
+                
+                guessEl.appendChild(avatarEl);
+                guessEl.appendChild(contentEl);
+                guessEl.appendChild(distanceEl);
+                
+                container.appendChild(guessEl);
+            });
+        }
 
-            sorted.forEach((entry, index) => {
-                const likeEl = document.createElement('div');
-                likeEl.className = 'event-item event-item-like';
+        function addHint(data) {
+            const container = document.getElementById('hints-list');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+            
+            const hintEl = document.createElement('div');
+            hintEl.className = 'hint-item';
+            hintEl.innerHTML = `
+                <div class="hint-icon">🎁</div>
+                <div class="hint-content">
+                    <div class="hint-word">${escapeHtml(data.word)}</div>
+                    <div class="hint-distance">Distance: ${data.distance}</div>
+                    <div class="hint-gifter">Thanks to ${escapeHtml(data.gifter)}!</div>
+                </div>
+            `;
+            
+            container.insertBefore(hintEl, container.firstChild);
+            
+            while (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function showWinner(data) {
+            const modal = document.getElementById('winner-modal');
+            
+            // Winner info
+            const avatarEl = document.getElementById('winner-avatar');
+            if (data.avatar_url) {
+                avatarEl.innerHTML = `<img src="${data.avatar_url}" alt="${data.user}">`;
+            } else {
+                avatarEl.textContent = data.user.charAt(0).toUpperCase();
+            }
+            
+            document.getElementById('winner-name').textContent = data.user;
+            document.getElementById('winner-word').textContent = data.word;
+            
+            // Leaderboard
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = '';
+            
+            data.leaderboard.forEach((entry, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'leaderboard-item';
+                
+                const rankEl = document.createElement('div');
+                rankEl.className = 'leaderboard-rank';
+                rankEl.textContent = `#${index + 1}`;
                 
                 const avatarEl = document.createElement('div');
-                avatarEl.className = 'event-item-avatar';
+                avatarEl.className = 'leaderboard-avatar';
                 if (entry.avatar_url) {
                     const img = document.createElement('img');
                     img.src = entry.avatar_url;
@@ -507,26 +407,80 @@
                 } else {
                     avatarEl.textContent = entry.user.charAt(0).toUpperCase();
                 }
-
-                const rankBadge = document.createElement('div');
-                rankBadge.className = 'rank-badge';
-                rankBadge.textContent = `#${index + 1}`;
-
-                const contentEl = document.createElement('div');
-                contentEl.className = 'event-item-content';
-                contentEl.innerHTML = `
-                    <div class="event-item-user">${escapeHtml(entry.user)}</div>
-                    <div class="event-item-detail">${entry.likes} likes</div>
+                
+                const infoEl = document.createElement('div');
+                infoEl.className = 'leaderboard-info';
+                infoEl.innerHTML = `
+                    <div class="leaderboard-user">${escapeHtml(entry.user)}</div>
+                    <div class="leaderboard-word">${escapeHtml(entry.word)}</div>
                 `;
-
-                likeEl.appendChild(rankBadge);
-                likeEl.appendChild(avatarEl);
-                likeEl.appendChild(contentEl);
-
-                container.appendChild(likeEl);
+                
+                const distanceEl = document.createElement('div');
+                distanceEl.className = 'leaderboard-distance';
+                distanceEl.textContent = entry.distance;
+                
+                itemEl.appendChild(rankEl);
+                itemEl.appendChild(avatarEl);
+                itemEl.appendChild(infoEl);
+                itemEl.appendChild(distanceEl);
+                
+                leaderboard.appendChild(itemEl);
             });
+            
+            modal.classList.add('show');
+            
+            // Auto-close after 10 seconds
+            setTimeout(() => {
+                modal.classList.remove('show');
+            }, 10000);
+        }
 
-            updateCounter('likes', likeRanking.size);
+        function closeWinnerModal() {
+            document.getElementById('winner-modal').classList.remove('show');
+        }
+
+        function addSocialEvent(data, type) {
+            const container = document.getElementById('social-list');
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+            
+            const eventEl = document.createElement('div');
+            eventEl.className = 'social-item';
+            
+            const avatarEl = document.createElement('div');
+            avatarEl.className = 'social-avatar';
+            if (data.avatar_url) {
+                const img = document.createElement('img');
+                img.src = data.avatar_url;
+                img.alt = data.user;
+                img.onerror = function() {
+                    avatarEl.innerHTML = data.user.charAt(0).toUpperCase();
+                };
+                avatarEl.appendChild(img);
+            } else {
+                avatarEl.textContent = data.user.charAt(0).toUpperCase();
+            }
+            
+            const icon = type === 'follow' ? '👤' : '📤';
+            const action = type === 'follow' ? 'followed' : 'shared';
+            
+            eventEl.innerHTML = `
+                ${icon}
+                <div class="social-content">
+                    <span class="social-user">${escapeHtml(data.user)}</span>
+                    <span class="social-action">${action}</span>
+                </div>
+            `;
+            eventEl.insertBefore(avatarEl, eventEl.firstChild);
+            
+            container.insertBefore(eventEl, container.firstChild);
+            
+            socialCount++;
+            document.getElementById('social-count').textContent = socialCount;
+            
+            while (container.children.length > 20) {
+                container.removeChild(container.lastChild);
+            }
         }
 
         function connectToStream() {
@@ -558,13 +512,21 @@
             updateConnectionStatus('disconnected');
         }
 
+        function resetGame() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    action: 'reset_game'
+                }));
+            }
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
-        // Connect WebSocket on page load (but don't connect to TikTok)
+        // Connect WebSocket on page load
         connectWebSocket();
 
         // Allow Enter key to connect
