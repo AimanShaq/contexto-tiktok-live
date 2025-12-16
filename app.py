@@ -124,6 +124,7 @@ async def on_comment(event: CommentEvent):
     try:
         # Clean the word
         word = clean_word(event.comment)
+        # print(word)
         
         # Validate word
         if not word or len(word) < 2:
