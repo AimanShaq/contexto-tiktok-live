@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   tiktok-live:
-    build: .
+    build:
+      context: .
+      no_cache: true
     container_name: tiktok-live-viewer
     ports:
       - "8080:8080"

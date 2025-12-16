@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import base64
 from typing import Set
 from aiohttp import web, WSMsgType, ClientSession
 from TikTokLive import TikTokLiveClient
@@ -124,7 +125,6 @@ async def on_comment(event: CommentEvent):
     try:
         # Clean the word
         word = clean_word(event.comment)
-        # print(word)
         
         # Validate word
         if not word or len(word) < 2:
@@ -139,13 +139,13 @@ async def on_comment(event: CommentEvent):
         avatar_url = None
         try:
             if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                print(word)
                 image_bytes = await tiktok_client.web.fetch_image_data(
                     image=event.user.avatar_thumb
                 )
                 if image_bytes:
-                    import base64
                     avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:
+        except Exception as img_error:``
             print(f"Error fetching avatar: {img_error}")
         
         # Show popup notification
@@ -155,9 +155,9 @@ async def on_comment(event: CommentEvent):
             'word': word,
             'timestamp': asyncio.get_event_loop().time()
         })
-        
+
         # Fetch from Contexto API
-        print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
+        # print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
         result = await fetch_contexto_api(game_state['game_number'], word)
         
         if not result:
