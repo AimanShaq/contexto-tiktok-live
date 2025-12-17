@@ -94,7 +94,9 @@ async def process_guess_queue():
             
         except Exception as e:
             print(f"Error in process_guess_queue: {e}")
-            api_queue.task_done()import asyncio
+            api_queue.task_done()
+            
+import asyncio
 import json
 import os
 import re
