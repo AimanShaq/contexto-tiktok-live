@@ -1,4 +1,100 @@
-import asyncio
+async def process_guess_queue():
+    """Background worker to process queued guesses"""
+    while True:
+        try:
+            # Get guess from queue
+            guess_data = await api_queue.get()
+            
+            if guess_data is None:  # Shutdown signal
+                break
+            
+            event, word, avatar_url = guess_data
+            
+            # Fetch from Contexto API
+            print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
+            result = await fetch_contexto_api(game_state['game_number'], word)
+            
+            if not result:
+                print(f"❌ Failed to get valid response for '{word}'")
+                api_queue.task_done()
+                continue
+            
+            distance = result['distance']
+            
+            # Show popup notification with distance and color
+            await broadcast_to_clients({
+                'type': 'guess_notification',
+                'user': event.user.nickname,
+                'word': word,
+                'distance': distance,
+                'avatar_url': avatar_url,
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            
+            # Add to guessed words
+            game_state['guessed_words'].add(word)
+            
+            # Store guess
+            game_state['guesses'][word] = {
+                'distance': distance,
+                'user': event.user.nickname,
+                'user_id': event.user.unique_id,
+                'avatar_url': avatar_url
+            }
+            
+            print(f"📊 {event.user.nickname} guessed '{word}' - Distance: {distance}")
+            
+            # Check for winner
+            if distance == 0:
+                print(f"🎉 WINNER! {event.user.nickname} guessed '{word}'!")
+                
+                # Get top 3 guesses
+                sorted_guesses = sorted(
+                    game_state['guesses'].items(),
+                    key=lambda x: x[1]['distance']
+                )[:3]
+                
+                leaderboard = [
+                    {
+                        'word': w,
+                        'user': data['user'],
+                        'distance': data['distance'],
+                        'avatar_url': data['avatar_url']
+                    }
+                    for w, data in sorted_guesses
+                ]
+                
+                await broadcast_to_clients({
+                    'type': 'winner',
+                    'word': word,
+                    'user': event.user.nickname,
+                    'avatar_url': avatar_url,
+                    'leaderboard': leaderboard,
+                    'timestamp': asyncio.get_event_loop().time()
+                })
+                
+                # Start new game after 10 seconds
+                await asyncio.sleep(10)
+                game_no = init_new_game()
+                await broadcast_to_clients({
+                    'type': 'game_start',
+                    'game_number': game_no,
+                    'timestamp': asyncio.get_event_loop().time()
+                })
+                
+            else:
+                # Broadcast guess update
+                await broadcast_to_clients({
+                    'type': 'guess_update',
+                    'guesses': game_state['guesses'],
+                    'timestamp': asyncio.get_event_loop().time()
+                })
+            
+            api_queue.task_done()
+            
+        except Exception as e:
+            print(f"Error in process_guess_queue: {e}")
+            api_queue.task_done()import asyncio
 import json
 import os
 import re
@@ -12,6 +108,7 @@ from TikTokLive.events import (
 import random
 import hashlib
 from pathlib import Path
+import time
 
 # Store connected WebSocket clients
 websocket_clients: Set[web.WebSocketResponse] = set()
@@ -30,6 +127,12 @@ game_state = {
 avatar_cache: Dict[str, str] = {}  # user_id -> base64_avatar
 AVATAR_CACHE_DIR = Path("/tmp/tiktok_avatars")
 MAX_AVATAR_CACHE = 50
+
+# API rate limiting
+api_queue = asyncio.Queue()
+api_semaphore = asyncio.Semaphore(3)  # Max 3 concurrent requests
+last_request_time = 0
+MIN_REQUEST_INTERVAL = 0.1  # 100ms between requests
 
 
 def init_new_game():
@@ -270,84 +373,9 @@ async def on_comment(event: CommentEvent):
         
         avatar_url = await get_cached_avatar(event.user.unique_id, fetch_avatar)
         
-        # Fetch from Contexto API
-        print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
-        result = await fetch_contexto_api(game_state['game_number'], word)
-        
-        if not result:
-            print(f"❌ Failed to get valid response for '{word}'")
-            return
-        
-        distance = result['distance']
-        
-        # Show popup notification with distance and color
-        await broadcast_to_clients({
-            'type': 'guess_notification',
-            'user': event.user.nickname,
-            'word': word,
-            'distance': distance,
-            'avatar_url': avatar_url,
-            'timestamp': asyncio.get_event_loop().time()
-        })
-        
-        # Add to guessed words
-        game_state['guessed_words'].add(word)
-        
-        # Store guess
-        game_state['guesses'][word] = {
-            'distance': distance,
-            'user': event.user.nickname,
-            'user_id': event.user.unique_id,
-            'avatar_url': avatar_url
-        }
-        
-        print(f"📊 {event.user.nickname} guessed '{word}' - Distance: {distance}")
-        
-        # Check for winner
-        if distance == 0:
-            print(f"🎉 WINNER! {event.user.nickname} guessed '{word}'!")
-            
-            # Get top 3 guesses
-            sorted_guesses = sorted(
-                game_state['guesses'].items(),
-                key=lambda x: x[1]['distance']
-            )[:3]
-            
-            leaderboard = [
-                {
-                    'word': word,
-                    'user': data['user'],
-                    'distance': data['distance'],
-                    'avatar_url': data['avatar_url']
-                }
-                for word, data in sorted_guesses
-            ]
-            
-            await broadcast_to_clients({
-                'type': 'winner',
-                'word': word,
-                'user': event.user.nickname,
-                'avatar_url': avatar_url,
-                'leaderboard': leaderboard,
-                'timestamp': asyncio.get_event_loop().time()
-            })
-            
-            # Start new game after 10 seconds
-            await asyncio.sleep(10)
-            game_no = init_new_game()
-            await broadcast_to_clients({
-                'type': 'game_start',
-                'game_number': game_no,
-                'timestamp': asyncio.get_event_loop().time()
-            })
-            
-        else:
-            # Broadcast guess update
-            await broadcast_to_clients({
-                'type': 'guess_update',
-                'guesses': game_state['guesses'],
-                'timestamp': asyncio.get_event_loop().time()
-            })
+        # Add to queue for processing (non-blocking)
+        await api_queue.put((event, word, avatar_url))
+        print(f"📥 Queued guess '{word}' from {event.user.nickname} (Queue size: {api_queue.qsize()})")
         
     except Exception as e:
         print(f"Error in on_comment: {e}")
@@ -654,11 +682,22 @@ async def start_background_tasks(app):
     # Initialize avatar cache and game
     init_avatar_cache()
     init_new_game()
+    
+    # Start queue processor
+    app['queue_processor'] = asyncio.create_task(process_guess_queue())
+    print("✅ Guess queue processor started")
 
 
 async def cleanup_background_tasks(app):
     """Cleanup on shutdown"""
     global tiktok_client
+    
+    # Stop queue processor
+    await api_queue.put(None)  # Shutdown signal
+    if 'queue_processor' in app:
+        await app['queue_processor']
+    print("✅ Guess queue processor stopped")
+    
     if tiktok_client and tiktok_client.connected:
         await tiktok_client.disconnect()
     cleanup_avatar_cache()
