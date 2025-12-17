@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import re
-from typing import Set
+from typing import Set, Dict, Optional
 from aiohttp import web, WSMsgType, ClientSession
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import (
@@ -10,6 +10,8 @@ from TikTokLive.events import (
     FollowEvent, ShareEvent, DisconnectEvent
 )
 import random
+import hashlib
+from pathlib import Path
 
 # Store connected WebSocket clients
 websocket_clients: Set[web.WebSocketResponse] = set()
@@ -24,6 +26,11 @@ game_state = {
     'guessed_words': set()
 }
 
+# Avatar cache
+avatar_cache: Dict[str, str] = {}  # user_id -> base64_avatar
+AVATAR_CACHE_DIR = Path("/tmp/tiktok_avatars")
+MAX_AVATAR_CACHE = 50
+
 
 def init_new_game():
     """Initialize a new game"""
@@ -32,6 +39,67 @@ def init_new_game():
     game_state['guessed_words'] = set()
     print(f"🎮 New game started! Game #{game_state['game_number']}")
     return game_state['game_number']
+
+
+def init_avatar_cache():
+    """Initialize avatar cache directory"""
+    AVATAR_CACHE_DIR.mkdir(exist_ok=True)
+    print(f"📁 Avatar cache initialized at {AVATAR_CACHE_DIR}")
+
+
+def cleanup_avatar_cache():
+    """Clean up avatar cache on shutdown"""
+    if AVATAR_CACHE_DIR.exists():
+        for file in AVATAR_CACHE_DIR.glob("*.txt"):
+            file.unlink()
+        print("🗑️ Avatar cache cleaned up")
+
+
+def get_user_hash(user_id: str) -> str:
+    """Get hash for user ID"""
+    return hashlib.md5(user_id.encode()).hexdigest()[:16]
+
+
+async def get_cached_avatar(user_id: str, fetch_func) -> Optional[str]:
+    """Get avatar from cache or fetch and cache it"""
+    user_hash = get_user_hash(user_id)
+    
+    # Check memory cache first
+    if user_id in avatar_cache:
+        return avatar_cache[user_id]
+    
+    # Check file cache
+    cache_file = AVATAR_CACHE_DIR / f"{user_hash}.txt"
+    if cache_file.exists():
+        try:
+            avatar_url = cache_file.read_text()
+            avatar_cache[user_id] = avatar_url
+            return avatar_url
+        except Exception as e:
+            print(f"Error reading cache for {user_id}: {e}")
+    
+    # Fetch new avatar
+    try:
+        avatar_url = await fetch_func()
+        if avatar_url:
+            # Manage cache size
+            if len(avatar_cache) >= MAX_AVATAR_CACHE:
+                # Remove oldest (first) item
+                oldest_key = next(iter(avatar_cache))
+                old_hash = get_user_hash(oldest_key)
+                old_file = AVATAR_CACHE_DIR / f"{old_hash}.txt"
+                if old_file.exists():
+                    old_file.unlink()
+                del avatar_cache[oldest_key]
+            
+            # Cache new avatar
+            avatar_cache[user_id] = avatar_url
+            cache_file.write_text(avatar_url)
+            return avatar_url
+    except Exception as e:
+        print(f"Error fetching avatar for {user_id}: {e}")
+    
+    return None
 
 
 async def broadcast_to_clients(event_data: dict):
@@ -59,9 +127,17 @@ async def fetch_contexto_api(game_no: int, word: str):
                     data = await response.json()
                     if 'distance' in data and 'word' in data:
                         return data
+                else:
+                    print(f"❌ Contexto API returned status {response.status} for word '{word}'")
+                    error_text = await response.text()
+                    print(f"   Response: {error_text}")
+                    return None
+        return None
+    except asyncio.TimeoutError:
+        print(f"⏱️ Contexto API timeout for word '{word}'")
         return None
     except Exception as e:
-        print(f"Error fetching Contexto API: {e}")
+        print(f"❌ Error fetching Contexto API for '{word}': {type(e).__name__}: {e}")
         return None
 
 
@@ -70,23 +146,44 @@ async def fetch_contexto_tip(game_no: int, distance: int):
     try:
         url = f"https://api.contexto.me/machado/en/tip/{game_no}/{distance}"
         async with ClientSession() as session:
-            async with session.get(url, timeout=2) as response:
+            async with session.get(url, timeout=5) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data.get('word')
+                else:
+                    print(f"❌ Contexto tip API returned status {response.status}")
+                    error_text = await response.text()
+                    print(f"   Response: {error_text}")
+        return None
+    except asyncio.TimeoutError:
+        print(f"⏱️ Contexto tip API timeout")
         return None
     except Exception as e:
-        print(f"Error fetching Contexto tip: {e}")
+        print(f"❌ Error fetching Contexto tip: {type(e).__name__}: {e}")
         return None
 
 
-def clean_word(text: str) -> str:
+def clean_word(text: str) -> Optional[str]:
     """Clean word to only contain A-Z letters"""
-    # Get first sentence (split by . ! ?)
-    first_sentence = re.split(r'[.!?]', text)[0].strip()
-    # Remove all non-letter characters and convert to lowercase
-    cleaned = re.sub(r'[^a-zA-Z]', '', first_sentence).lower()
-    return cleaned
+    # Strip leading/trailing whitespace first
+    text = text.strip()
+
+    # Ignore if more than one word
+    if len(text.split()) != 1:
+        return None
+
+    # Ignore if it contains any numbers
+    if any(char.isdigit() for char in text):
+        return None
+
+    # Remove symbols and whitespace, keep only letters
+    cleaned = re.sub(r'[^A-Za-z]', '', text)
+    
+    # Return None if too short after cleaning
+    if len(cleaned) < 2:
+        return None
+    
+    return cleaned.lower()
 
 
 async def on_connect(event: ConnectEvent):
@@ -126,35 +223,52 @@ async def on_comment(event: CommentEvent):
         word = clean_word(event.comment)
         
         # Validate word
-        if not word or len(word) < 2:
+        if not word:
             return
         
         # Check if already guessed
         if word in game_state['guessed_words']:
-            print(f"⚠️ Word '{word}' already guessed, ignoring")
+            print(f"⚠️ Word '{word}' already guessed by {event.user.nickname}")
+            
+            # Get existing guess data
+            existing_data = game_state['guesses'].get(word)
+            if existing_data:
+                # Get profile picture from cache
+                async def fetch_avatar():
+                    if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                        image_bytes = await tiktok_client.web.fetch_image_data(
+                            image=event.user.avatar_thumb
+                        )
+                        if image_bytes:
+                            import base64
+                            return f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+                    return None
+                
+                avatar_url = await get_cached_avatar(event.user.unique_id, fetch_avatar)
+                
+                # Send already guessed notification
+                await broadcast_to_clients({
+                    'type': 'already_guessed',
+                    'user': event.user.nickname,
+                    'word': word,
+                    'distance': existing_data['distance'],
+                    'avatar_url': avatar_url,
+                    'timestamp': asyncio.get_event_loop().time()
+                })
             return
         
-        # Get profile picture
-        avatar_url = None
-        try:
+        # Get profile picture from cache
+        async def fetch_avatar():
             if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
                 image_bytes = await tiktok_client.web.fetch_image_data(
                     image=event.user.avatar_thumb
                 )
                 if image_bytes:
                     import base64
-                    avatar_url = f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
-        except Exception as img_error:
-            print(f"Error fetching avatar: {img_error}")
+                    return f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+            return None
         
-        # Show popup notification
-        await broadcast_to_clients({
-            'type': 'guess_notification',
-            'user': event.user.nickname,
-            'word': word,
-            'avatar_url': avatar_url,
-            'timestamp': asyncio.get_event_loop().time()
-        })
+        avatar_url = await get_cached_avatar(event.user.unique_id, fetch_avatar)
         
         # Fetch from Contexto API
         print(f"🎯 Processing guess '{word}' from {event.user.nickname}")
@@ -165,6 +279,16 @@ async def on_comment(event: CommentEvent):
             return
         
         distance = result['distance']
+        
+        # Show popup notification with distance and color
+        await broadcast_to_clients({
+            'type': 'guess_notification',
+            'user': event.user.nickname,
+            'word': word,
+            'distance': distance,
+            'avatar_url': avatar_url,
+            'timestamp': asyncio.get_event_loop().time()
+        })
         
         # Add to guessed words
         game_state['guessed_words'].add(word)
@@ -230,7 +354,7 @@ async def on_comment(event: CommentEvent):
 
 
 async def on_gift(event: GiftEvent):
-    """Handle gift events - provide hint"""
+    """Handle gift events - provide hint and auto-guess"""
     try:
         # Only process if gift streak ended
         is_repeatable = getattr(event.gift, 'streakable', False)
@@ -250,7 +374,7 @@ async def on_gift(event: GiftEvent):
         # Calculate hint distance
         hint_distance = max(1, lowest_distance // 2)
         
-        print(f"🎁 Gift received! Getting hint for distance {hint_distance}")
+        print(f"🎁 Gift from {event.user.nickname}! Getting hint for distance {hint_distance}")
         
         # Fetch tip
         tip_word = await fetch_contexto_tip(game_state['game_number'], hint_distance)
@@ -264,6 +388,46 @@ async def on_gift(event: GiftEvent):
                 'timestamp': asyncio.get_event_loop().time()
             })
             print(f"💡 Hint revealed: '{tip_word}' at distance {hint_distance}")
+            
+            # Auto-guess the hint word for the gifter
+            print(f"🎯 Auto-guessing '{tip_word}' for gifter {event.user.nickname}")
+            
+            # Check if already guessed
+            if tip_word not in game_state['guessed_words']:
+                # Get profile picture from cache
+                async def fetch_avatar():
+                    if hasattr(event.user, 'avatar_thumb') and event.user.avatar_thumb:
+                        image_bytes = await tiktok_client.web.fetch_image_data(
+                            image=event.user.avatar_thumb
+                        )
+                        if image_bytes:
+                            import base64
+                            return f"data:image/webp;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+                    return None
+                
+                avatar_url = await get_cached_avatar(event.user.unique_id, fetch_avatar)
+                
+                # Add to guessed words
+                game_state['guessed_words'].add(tip_word)
+                
+                # Store guess with hint distance
+                game_state['guesses'][tip_word] = {
+                    'distance': hint_distance,
+                    'user': event.user.nickname,
+                    'user_id': event.user.unique_id,
+                    'avatar_url': avatar_url
+                }
+                
+                # Broadcast guess update
+                await broadcast_to_clients({
+                    'type': 'guess_update',
+                    'guesses': game_state['guesses'],
+                    'timestamp': asyncio.get_event_loop().time()
+                })
+                
+                print(f"✅ '{tip_word}' added to {event.user.nickname}'s guesses")
+            else:
+                print(f"⚠️ '{tip_word}' already guessed, not adding again")
         
     except Exception as e:
         print(f"Error in on_gift: {e}")
@@ -487,7 +651,8 @@ async def css_handler(request):
 async def start_background_tasks(app):
     """Start background tasks on app startup"""
     print("🚀 Server started. Ready for Contexto game!")
-    # Initialize game but don't connect
+    # Initialize avatar cache and game
+    init_avatar_cache()
     init_new_game()
 
 
@@ -496,6 +661,7 @@ async def cleanup_background_tasks(app):
     global tiktok_client
     if tiktok_client and tiktok_client.connected:
         await tiktok_client.disconnect()
+    cleanup_avatar_cache()
 
 
 def main():

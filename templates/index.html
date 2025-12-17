@@ -66,8 +66,7 @@
             <div class="game-header">
                 <div class="game-title">
                     <span class="game-label">GAME: #</span>
-                    <!-- <span class="game-number" id="game-number">----</span> -->
-                    <span class="game-number" >RANDOM</span>
+                    <span class="game-number">RANDOM</span>
                 </div>
                 <div class="game-guesses">
                     <span class="guesses-label">GUESSES:</span>
@@ -101,6 +100,7 @@
                     <p>🟠 Orange (500-1500): Getting there</p>
                     <p>🔴 Red (>1500): Far away</p>
                     <p>🎁 Send gifts for hints!</p>
+                    <p id="game-number">----</p>
                 </div>
             </div>
 
@@ -218,6 +218,9 @@
                 case 'guess_notification':
                     showGuessNotification(data);
                     break;
+                case 'already_guessed':
+                    showAlreadyGuessedNotification(data);
+                    break;
                 case 'guess_update':
                     updateGuesses(data.guesses);
                     break;
@@ -282,6 +285,11 @@
         function showGuessNotification(data) {
             const popup = document.getElementById('notification-popup');
             
+            // Get color based on distance
+            const color = getDistanceColor(data.distance);
+            const colorClass = color === 'green' ? 'notif-green' : 
+                              color === 'orange' ? 'notif-orange' : 'notif-red';
+            
             // Create avatar element
             let avatarHTML = '';
             if (data.avatar_url) {
@@ -291,12 +299,56 @@
                 avatarHTML = `<div class="notif-avatar-fallback">${data.user.charAt(0).toUpperCase()}</div>`;
             }
             
+            popup.className = `notification-popup ${colorClass}`;
             popup.innerHTML = `
                 <div class="notif-avatar">${avatarHTML}</div>
                 <div class="notif-content">
                     <div class="notif-user">${escapeHtml(data.user)}</div>
                     <div class="notif-text">guessed: <strong>${escapeHtml(data.word)}</strong></div>
                 </div>
+                <div class="notif-distance">${data.distance}</div>
+            `;
+            
+            // Add pop animation
+            popup.classList.remove('show');
+            popup.classList.add('pop');
+            
+            setTimeout(() => {
+                popup.classList.remove('pop');
+                popup.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                popup.classList.remove('show');
+                setTimeout(() => popup.classList.remove('pop'), 300);
+            }, 3000);
+        }
+
+        function showAlreadyGuessedNotification(data) {
+            const popup = document.getElementById('notification-popup');
+            
+            // Get color based on distance
+            const color = getDistanceColor(data.distance);
+            const colorClass = color === 'green' ? 'notif-green' : 
+                              color === 'orange' ? 'notif-orange' : 'notif-red';
+            
+            // Create avatar element
+            let avatarHTML = '';
+            if (data.avatar_url) {
+                avatarHTML = `<img src="${data.avatar_url}" alt="${data.user}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                              <div class="notif-avatar-fallback" style="display:none;">${data.user.charAt(0).toUpperCase()}</div>`;
+            } else {
+                avatarHTML = `<div class="notif-avatar-fallback">${data.user.charAt(0).toUpperCase()}</div>`;
+            }
+            
+            popup.className = `notification-popup ${colorClass} notif-already`;
+            popup.innerHTML = `
+                <div class="notif-avatar">${avatarHTML}</div>
+                <div class="notif-content">
+                    <div class="notif-user">${escapeHtml(data.user)}</div>
+                    <div class="notif-text">already guessed: <strong>${escapeHtml(data.word)}</strong></div>
+                </div>
+                <div class="notif-distance">${data.distance}</div>
             `;
             
             // Add pop animation
