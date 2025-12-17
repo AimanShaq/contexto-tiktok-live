@@ -122,7 +122,7 @@ async def fetch_contexto_api(game_no: int, word: str):
     try:
         url = f"https://api.contexto.me/machado/en/game/{game_no}/{word}"
         async with ClientSession() as session:
-            async with session.get(url, timeout=2) as response:
+            async with session.get(url, timeout=5) as response:
                 if response.status == 200:
                     data = await response.json()
                     if 'distance' in data and 'word' in data:
